@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
 from typing import Annotated
 
-import joblib
+import requests
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException
 from fastapi.responses import FileResponse
@@ -24,6 +24,8 @@ job_info_example = {
     "clustering_hyperparams": {"n_clusters": 5},
     "embeddings_hyperparams": {"alpha": 0.3, "k": 10},
 }
+
+JOBS_SERVER_URL = "http://fastapi:8001"
 
 
 # ----------------------------------- Функции FastAPI сервиса ------------------------------------
@@ -62,10 +64,12 @@ async def root() -> Annotated[dict, "Метаданные корневой ст�
 async def perform_clustering(clustering_request: ClusteringRequest):
     # Генерация ID задачи
     job_id = "abcde_123"
-    response = JobAcceptedResponse(job_id=job_id).model_dump()
 
     # Передача задачи на jobs_server
     # В случае принятия задачи внутренним сервером возвращаем такой ответ:
+    json_request = 
+    response = requests.post(f"{JOBS_SERVER_URL}/commit_job", json=)
+
     status_code = status.HTTP_202_ACCEPTED
 
     return JSONResponse(status_code=status_code, content=response)
