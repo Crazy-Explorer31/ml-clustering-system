@@ -1,0 +1,22 @@
+services:
+  main_server:
+    build:
+      context: ./main_server
+    ports:
+      - "8000:8000"
+    depends_on:
+      - jobs_server
+    volumes:
+      # Монтирование директорий на время запуска
+      - ./logs:/app/logs
+      - ./common:/app/common
+
+  jobs_server:
+    build:
+      context: ./jobs_server
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./logs:/app/logs
+      - ./common:/app/common
+      - ./models:/app/models
