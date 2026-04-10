@@ -17,6 +17,26 @@ from common.query_schemas import *
 
 # ----------------------------------- Переменные окружения ---------------------------------------
 JOBS_SERVER_URL = os.getenv("JOBS_SERVER_URL", "http://localhost:8001")
+S3_ENDPOINT_INTERNAL = os.environ.get("S3_ENDPOINT_URL", "http://minio:9000")
+S3_ENDPOINT_EXTERNAL = os.environ.get(
+    "S3_ENDPOINT_EXTERNAL_URL", "http://localhost:9000"
+)
+AWS_ACCESS_KEY = os.environ.get("AWS_ACCESS_KEY_ID", "minioadmin")
+AWS_SECRET_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "minioadmin")
+AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+S3_BUCKET_RESULTS = os.environ.get("S3_BUCKET_RESULTS", "results")
+
+
+def get_s3_client(external: bool = False):
+    """Возвращает настроенный клиент S3 для MinIO."""
+    endpoint = S3_ENDPOINT_EXTERNAL if external else S3_ENDPOINT_INTERNAL
+    return boto3.client(
+        "s3",
+        endpoint_url=endpoint,
+        aws_access_key_id=AWS_ACCESS_KEY,
+        aws_secret_access_key=AWS_SECRET_KEY,
+        region_name=AWS_REGION,
+    )
 
 
 # ----------------------------------- Функции FastAPI сервиса ------------------------------------
@@ -125,19 +145,16 @@ async def job_result(
         )
 
     try:
-        async with get_s3_client() as s3_client:
-            url = s3_client.generate_presigned_url(
-                "get_object",
-                Params={
-                    "Bucket": S3_BUCKET_RESULTS,
-                    "Key": f"{job_id}.csv",
-                },
-                ExpiresIn=600,
-            )
-            if "minio" in url:
-                url = url.replace("minio", "localhost")
-
-            return ClusteringResultResponse(download_url=url)
-        # TODO надо как-то удалять скачанные результаты из S3
+        # Используем внешний клиент для генерации ссылки, доступной из браузера
+        external_s3 = get_s3_client(external=True)
+        url = external_s3.generate_presigned_url(
+            "get_object",
+            Params={
+                "Bucket": S3_BUCKET_RESULTS,
+                "Key": f"{job_id}.csv",
+            },
+            ExpiresIn=600,  # 10 минут
+        )
+        return ClusteringResultResponse(download_url=url)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
