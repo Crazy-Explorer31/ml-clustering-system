@@ -1,11 +1,11 @@
-# fastapi_app/Dockerfile
-FROM python:3.9
+# main_server/Dockerfile
+FROM python:3.11
 
 WORKDIR /app
 
 COPY requirements.txt .
 COPY umath-validation-set-log.csv .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --no-cache-dir -r requirements.txt
 
 COPY . .
 

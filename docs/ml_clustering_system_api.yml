@@ -1,0 +1,370 @@
+openapi: 3.0.3
+info:
+  title: ML Clustering System
+  description: |
+    Two‑server architecture:
+    - **Main Server** – user‑facing API for submitting jobs, checking status, and retrieving results.
+    - **Jobs Production Server** – internal API used to manage job lifecycle.
+  version: 1.0.0
+
+servers:
+  - url: https://api.main.example.com/v1
+    description: Main server (user‑facing)
+  - url: https://api.jobs-prod.internal/v1
+    description: Jobs production server (internal)
+
+tags:
+  - name: Main
+    description: Endpoints exposed to end users
+  - name: JobsProduction
+    description: Internal endpoints for job orchestration
+
+paths:
+  # ==================== Main server ====================
+  /perform_clustering:
+    post:
+      tags:
+        - Main
+      summary: Submit a new clustering job
+      description: |
+        Accepts dataset ID and clustering parameters.
+        Returns a job ID that can be used to track progress.
+      operationId: submitClustering
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusteringRequest'
+      responses:
+        '202':
+          description: Job accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobIdResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Dataset not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /job_info/{job_id}:
+    get:
+      tags:
+        - Main
+      summary: Get job info
+      description: Returns current info for the clustering job.
+      operationId: getJobInfo
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Job identifier
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobInfo'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /job_result/{job_id}:
+    get:
+      tags:
+        - Main
+      summary: Retrieve clustering result
+      description: |
+        Downloads the result (e.g., tables, visualizations) identified by job_id.
+      operationId: getResult
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Result identifier
+      responses:
+        '200':
+          description: Result file
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Disposition:
+              description: Download clustering result as csv
+              schema:
+                type: string
+                example: attachment; filename="result.csv"
+            Content-Type:
+              description: CSV file
+              schema:
+                type: string
+                example: text/csv
+        '404':
+          description: Result not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==================== Jobs production server ====================
+  /job_commit:
+    post:
+      tags:
+        - JobsProduction
+      summary: Forward job to jobs queue
+      description: |
+        Called by the main server to register a new clustering job.
+        The request contains the dataset ID, parameters and job ID.
+      operationId: commitJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusteringRequestWithJobId'
+      responses:
+        '201':
+          description: Job committed
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /jobs_info/{job_id}:
+    get:
+      tags:
+        - JobsProduction
+      summary: Get job details for workers
+      description: |
+        Used by workers to retrieve the current status and associated dataset/parameters.
+        Returns the job info.
+      operationId: getJobInfoInternal
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Job identifier
+      responses:
+        '200':
+          description: Job details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobInfo'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - JobsProduction
+      summary: Delete a job
+      description: |
+        Removes the job from the system. If the job is currently running, it may be cancelled.
+      operationId: deleteJob
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Job identifier
+      responses:
+        '204':
+          description: Job deleted successfully
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Cannot delete job in current state (e.g., running and cannot be cancelled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - JobsProduction
+      summary: Update job status
+      description: |
+        Called by workers to update the status of a job (e.g., running, done, failed)
+      operationId: jobUpdateStatus
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Job identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [running, waiting, done, failed]
+              required:
+                - status
+      responses:
+        '200':
+          description: Status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobInfo'
+        '400':
+          description: Invalid action or job state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - JobsProduction
+      summary: Puts a new job
+      description: |
+        Registers new job on a server
+      operationId: putJob
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Job identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusteringRequest'
+      responses:
+        '200':
+          description: Job put successfully
+        '400':
+          description: Job with such job_id already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    ClusteringRequest:
+      type: object
+      required:
+        - dataset_id
+        - clustering_params
+      properties:
+        dataset_id:
+          type: string
+          description: ID of the dataset stored in the datasets S3 bucket
+        clustering_params:
+          type: object
+          description: Algorithm‑specific parameters (e.g., n_clusters, method)
+          additionalProperties: true
+      example:
+        dataset_id: "ds-12345"
+        clustering_params:
+          n_clusters: 5
+          algorithm: "kmeans"
+    ClusteringRequestWithJobId:
+      type: object
+      required:
+        - dataset_id
+        - clustering_params
+      properties:
+        dataset_id:
+          type: string
+          description: ID of the dataset stored in the datasets S3 bucket
+        job_id:
+          type: string
+          description: Unique identifier for the job
+        clustering_params:
+          type: object
+          description: Algorithm‑specific parameters (e.g., n_clusters, method)
+          additionalProperties: true
+      example:
+        dataset_id: "ds-12345"
+        job_id: "job-abcde"
+        clustering_params:
+          n_clusters: 5
+          algorithm: "kmeans"
+
+    JobIdResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+          description: Unique identifier for the job
+      example:
+        job_id: "job-abcde"
+
+    JobInfo:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [running, waiting, done, failed]
+        dataset_id:
+          type: string
+          description: ID of the dataset to process
+        clustering_params:
+          type: object
+          description: Parameters for the clustering algorithm
+        error:
+          type: string
+          description: Error message if status is failed
+      example:
+        status: "running"
+        dataset_id: "ds-12345"
+        clustering_params:
+          n_clusters: 5
+          algorithm: "kmeans"
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      example:
+        message: "Some troubles"

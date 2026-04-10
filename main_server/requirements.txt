@@ -2,3 +2,5 @@ fastapi
 joblib
 pandas
 uvicorn
+requests
+aioboto3

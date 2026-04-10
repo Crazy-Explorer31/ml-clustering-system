@@ -2,3 +2,13 @@ fastapi
 joblib
 pandas
 uvicorn
+redis
+rq
+aioboto3
+python-multipart
+aiobotocore
+pyarrow
+gensim
+fasttext
+scikit-learn
+nltk
