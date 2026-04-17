@@ -4,3 +4,4 @@ pandas
 uvicorn
 requests
 aioboto3
+debugpy

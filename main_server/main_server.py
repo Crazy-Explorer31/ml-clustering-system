@@ -3,6 +3,7 @@ import os
 from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
 from typing import Annotated
+from fastapi.staticfiles import StaticFiles
 
 import requests
 import pandas as pd
@@ -17,26 +18,6 @@ from common.query_schemas import *
 
 # ----------------------------------- Переменные окружения ---------------------------------------
 JOBS_SERVER_URL = os.getenv("JOBS_SERVER_URL", "http://localhost:8001")
-S3_ENDPOINT_INTERNAL = os.environ.get("S3_ENDPOINT_URL", "http://minio:9000")
-S3_ENDPOINT_EXTERNAL = os.environ.get(
-    "S3_ENDPOINT_EXTERNAL_URL", "http://localhost:9000"
-)
-AWS_ACCESS_KEY = os.environ.get("AWS_ACCESS_KEY_ID", "minioadmin")
-AWS_SECRET_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "minioadmin")
-AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
-S3_BUCKET_RESULTS = os.environ.get("S3_BUCKET_RESULTS", "results")
-
-
-def get_s3_client(external: bool = False):
-    """Возвращает настроенный клиент S3 для MinIO."""
-    endpoint = S3_ENDPOINT_EXTERNAL if external else S3_ENDPOINT_INTERNAL
-    return boto3.client(
-        "s3",
-        endpoint_url=endpoint,
-        aws_access_key_id=AWS_ACCESS_KEY,
-        aws_secret_access_key=AWS_SECRET_KEY,
-        region_name=AWS_REGION,
-    )
 
 
 # ----------------------------------- Функции FastAPI сервиса ------------------------------------
@@ -74,19 +55,20 @@ async def root() -> Annotated[dict, "Метаданные корневой ст�
 )
 async def perform_clustering(clustering_request: ClusteringRequest):
     # Перенаправляем запрос на внутренний сервер
-    request_content = clustering_request.model_dump()
+    request_dict = clustering_request.model_dump()
 
     try:
-        response = requests.post(f"{JOBS_SERVER_URL}/job_commit", json=request_content)
+        response = requests.post(f"{JOBS_SERVER_URL}/job_commit", json=request_dict)
     except:
         raise HTTPException(status_code=422)
 
     status_code = response.status_code
-    if status_code != 202:
-        raise HTTPException(status_code=status_code, detail=response.content["detail"])
+    content_dict = response.json()
 
-    content = response.json()
-    return JobAcceptedResponse.model_validate(content)
+    if status_code != 202:
+        raise HTTPException(status_code=status_code, detail=content_dict.get("detail"))
+
+    return JobAcceptedResponse.model_validate(content_dict)
 
 
 @app.get(
@@ -105,13 +87,14 @@ async def job_info(job_id: Annotated[str, "ID задачи кластериза�
         response = requests.get(f"{JOBS_SERVER_URL}/job_info/{job_id}")
     except:
         raise HTTPException(status_code=422, detail="Некорректный запрос")
+
     status_code = response.status_code
-    content = response.json()
+    content_dict = response.json()
 
     if status_code != 200:
-        raise HTTPException(status_code=status_code, detail=content.get("detail"))
+        raise HTTPException(status_code=status_code, detail=content_dict.get("detail"))
 
-    return JobInfoResponse.model_validate(content)
+    return JobInfoResponse.model_validate(content_dict)
 
 
 @app.get(
@@ -132,14 +115,13 @@ async def job_result(
     # В случае готовности задачи, возвращаем ссылку на результат задачи с S3 хранилищаы
 
     response = requests.get(f"{JOBS_SERVER_URL}/job_info/{job_id}")
-
     status_code = response.status_code
+    content_dict = response.json()
 
     if status_code != status.HTTP_200_OK:
-        raise HTTPException(status_code=status_code, detail=response.content["detail"])
+        raise HTTPException(status_code=status_code, detail=content_dict.get("detail"))
 
-    content = response.json()
-    if content["status"] != "done":
+    if content_dict["status"] != "done":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Результат ещё не готов"
         )
@@ -158,3 +140,6 @@ async def job_result(
         return ClusteringResultResponse(download_url=url)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+app.mount("/ui", StaticFiles(directory="static", html=True), name="static")

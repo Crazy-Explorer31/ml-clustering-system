@@ -12,3 +12,4 @@ gensim
 fasttext
 scikit-learn
 nltk
+debugpy

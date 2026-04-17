@@ -4,6 +4,9 @@ services:
       context: ./main_server
     ports:
       - "8000:8000"
+    #   - "5678:5678" # debug main_server
+    # command: >
+    #   sh -c "python -m debugpy --listen 0.0.0.0:5678 -m uvicorn main_server:app --host 0.0.0.0 --port 8000 --reload"
     depends_on:
       jobs_server:
         condition: service_healthy
@@ -27,6 +30,9 @@ services:
       context: ./jobs_server
     ports:
       - "8001:8001"
+      - "5678:5678" # debug jobs_server
+    command: >
+      sh -c "python -m debugpy --listen 0.0.0.0:5678 -m uvicorn jobs_server:app --host 0.0.0.0 --port 8001 --reload"
     volumes:
       - ./logs:/app/logs
       - ./common:/app/common

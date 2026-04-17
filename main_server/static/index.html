@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Кластеризация медицинских документов · Тёмная тема</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            font-family: system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+        }
+
+        body {
+            background: #0b1120;
+            display: flex;
+            justify-content: center;
+            padding: 2rem 1rem;
+            margin: 0;
+            color: #e2e8f0;
+        }
+
+        .container {
+            max-width: 1000px;
+            width: 100%;
+            background: #1e293b;
+            border-radius: 24px;
+            box-shadow: 0 20px 35px -8px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(56, 189, 248, 0.1);
+            padding: 2rem 2rem 2.5rem;
+            border: 1px solid #334155;
+        }
+
+        h1 {
+            font-weight: 600;
+            font-size: 2rem;
+            color: #f0f9ff;
+            margin-bottom: 0.25rem;
+            letter-spacing: -0.01em;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            margin-bottom: 2rem;
+            border-left: 4px solid #38bdf8;
+            padding-left: 1rem;
+            font-weight: 400;
+        }
+
+        .card {
+            background: #0f172a;
+            border-radius: 20px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid #334155;
+            box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.03), 0 4px 6px -2px #00000030;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-header h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #f1f5f9;
+            margin: 0;
+        }
+
+        .badge {
+            background: #1e3a5f;
+            color: #b9d9ff;
+            padding: 0.2rem 0.8rem;
+            border-radius: 30px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            border: 1px solid #2d4a6e;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.2rem 1.5rem;
+        }
+
+        .full-width {
+            grid-column: span 2;
+        }
+
+        label {
+            font-weight: 500;
+            font-size: 0.9rem;
+            color: #cbd5e1;
+            display: block;
+            margin-bottom: 0.3rem;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 0.7rem 1rem;
+            border: 1.5px solid #334155;
+            border-radius: 14px;
+            font-size: 0.95rem;
+            transition: all 0.15s;
+            background: #1e293b;
+            color: #f1f5f9;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #38bdf8;
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+            background: #1e293b;
+        }
+
+        textarea {
+            font-family: 'SF Mono', 'Menlo', 'Monaco', 'Cascadia Code', monospace;
+            min-height: 90px;
+            resize: vertical;
+        }
+
+        .hint {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-top: 0.2rem;
+        }
+
+        .btn {
+            background: #2563eb;
+            color: white;
+            border: none;
+            font-weight: 600;
+            padding: 0.8rem 1.8rem;
+            border-radius: 40px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.05s;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+            border: 1px solid #3b82f6;
+        }
+
+        .btn:hover {
+            background: #3b82f6;
+            box-shadow: 0 6px 14px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-outline {
+            background: #1e293b;
+            color: #e2e8f0;
+            border: 1.5px solid #475569;
+            box-shadow: none;
+            padding: 0.6rem 1.4rem;
+        }
+
+        .btn-outline:hover {
+            background: #334155;
+            border-color: #64748b;
+            color: #f8fafc;
+        }
+
+        .action-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+            margin: 1.5rem 0 0.5rem;
+        }
+
+        .job-id-input {
+            flex: 2;
+            min-width: 240px;
+        }
+
+        .info-box {
+            background: #0b1120;
+            border-radius: 18px;
+            padding: 1.2rem 1.5rem;
+            margin-top: 1.5rem;
+            border: 1px solid #334155;
+            box-shadow: inset 0 2px 4px #00000040;
+        }
+
+        .status-chip {
+            display: inline-block;
+            padding: 0.25rem 1rem;
+            border-radius: 30px;
+            font-weight: 500;
+            font-size: 0.85rem;
+            border: 1px solid;
+        }
+
+        .status-waiting {
+            background: #422800;
+            color: #fbbf24;
+            border-color: #b45309;
+        }
+
+        .status-running {
+            background: #1e2f4b;
+            color: #7dd3fc;
+            border-color: #0369a1;
+        }
+
+        .status-done {
+            background: #064e3b;
+            color: #6ee7b7;
+            border-color: #047857;
+        }
+
+        .status-failed {
+            background: #450a0a;
+            color: #fca5a5;
+            border-color: #b91c1c;
+        }
+
+        .download-link {
+            display: inline-block;
+            margin-top: 1rem;
+            background: #0f172a;
+            color: white;
+            padding: 0.6rem 1.8rem;
+            border-radius: 40px;
+            text-decoration: none;
+            font-weight: 500;
+            border: 1px solid #38bdf8;
+            box-shadow: 0 0 10px #0284c730;
+        }
+
+        .download-link:hover {
+            background: #1e293b;
+            border-color: #7dd3fc;
+        }
+
+        .error-msg {
+            color: #fecaca;
+            background: #3b1e1e;
+            padding: 0.8rem 1.2rem;
+            border-radius: 16px;
+            margin: 1rem 0;
+            border-left: 6px solid #ef4444;
+            border: 1px solid #7f1d1d;
+        }
+
+        .success-msg {
+            background: #0b2e26;
+            color: #bbf7d0;
+            padding: 0.8rem 1.2rem;
+            border-radius: 16px;
+            margin: 1rem 0;
+            border-left: 6px solid #22c55e;
+            border: 1px solid #166534;
+        }
+
+        pre {
+            background: #020617;
+            color: #cbd5e1;
+            padding: 1rem;
+            border-radius: 16px;
+            overflow-x: auto;
+            font-size: 0.85rem;
+            border: 1px solid #1e293b;
+        }
+
+        hr {
+            border: none;
+            border-top: 2px dashed #334155;
+            margin: 1.8rem 0;
+        }
+
+        .footer-note {
+            color: #64748b;
+            font-size: 0.85rem;
+            text-align: right;
+        }
+
+        ::placeholder {
+            color: #64748b;
+            opacity: 0.7;
+        }
+
+        select option {
+            background: #1e293b;
+            color: #f1f5f9;
+        }
+
+        .param-group {
+            background: #1a2536;
+            border-radius: 16px;
+            padding: 1rem;
+            margin-top: 0.75rem;
+            border: 1px solid #2d3a4e;
+        }
+
+        .param-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🧬 Кластеризация медицинских документов</h1>
+        <div id="root-description" class="subtitle">Загрузка описания сервиса...</div>
+
+        <!-- Форма создания задачи -->
+        <div class="card">
+            <div class="card-header">
+                <h2>📤 Новая задача кластеризации</h2>
+                <span class="badge">POST /perform_clustering</span>
+            </div>
+            <form id="clustering-form">
+                <div class="form-grid">
+                    <div class="full-width">
+                        <label>📁 Датасет</label>
+                        <select id="dataset-id">
+                            <option value="data" selected>data (основной набор)</option>
+                        </select>
+                        <div class="hint">Выберите датасет для кластеризации</div>
+                    </div>
+                    <div>
+                        <label>🧩 Алгоритм кластеризации</label>
+                        <select id="clustering-algo">
+                            <option value="kmeans" selected>k-means</option>
+                            <option value="spectral">spectral</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>🔤 Метод эмбеддингов</label>
+                        <select id="embeddings-method">
+                            <option value="tfidf" selected>TF-IDF</option>
+                            <option value="word2vec">Word2Vec</option>
+                            <option value="fasttext">FastText</option>
+                            <option value="doc2vec">Doc2Vec</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Динамические блоки гиперпараметров -->
+                <div class="full-width" style="margin-top: 1rem;">
+                    <div id="clustering-params-container" class="param-group">
+                        <!-- здесь будут поля для алгоритма кластеризации -->
+                    </div>
+                    <div id="embeddings-params-container" class="param-group" style="margin-top: 1rem;">
+                        <!-- здесь будут поля для метода эмбеддингов -->
+                    </div>
+                </div>
+
+                <div class="action-bar">
+                    <button type="submit" class="btn">🚀 Отправить задачу</button>
+                    <span id="form-status" style="color:#94a3b8;"></span>
+                </div>
+            </form>
+            <div id="job-created-info" style="margin-top: 1rem;"></div>
+        </div>
+
+        <!-- Проверка статуса и результата -->
+        <div class="card">
+            <div class="card-header">
+                <h2>🔍 Информация о задаче</h2>
+                <span class="badge">GET /job_info/{job_id}</span>
+            </div>
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
+                <div style="flex:3; min-width: 220px;">
+                    <label>🆔 ID задачи</label>
+                    <input type="text" id="job-id-input" placeholder="например: abcde_123" class="job-id-input">
+                </div>
+                <div style="display: flex; gap: 0.8rem;">
+                    <button id="check-info-btn" class="btn-outline">📋 Статус</button>
+                    <button id="get-result-btn" class="btn-outline">📥 Получить результат</button>
+                </div>
+            </div>
+
+            <div id="job-info-display" class="info-box">
+                <p style="color: #94a3b8; margin:0;">Введите ID задачи и нажмите «Статус»</p>
+            </div>
+            <div id="result-display"></div>
+            <div id="error-display"></div>
+        </div>
+
+        <hr>
+        <div class="footer-note">
+            ⚡ UI для сервиса кластеризации • OpenAPI 3.1 • Тёмная тема
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            // ---------- DOM элементы ----------
+            const rootDesc = document.getElementById('root-description');
+            const form = document.getElementById('clustering-form');
+            const datasetSelect = document.getElementById('dataset-id');
+            const clusteringAlgoSelect = document.getElementById('clustering-algo');
+            const embeddingsMethodSelect = document.getElementById('embeddings-method');
+            const clusteringParamsContainer = document.getElementById('clustering-params-container');
+            const embeddingsParamsContainer = document.getElementById('embeddings-params-container');
+            const formStatus = document.getElementById('form-status');
+            const jobCreatedInfo = document.getElementById('job-created-info');
+            const jobIdInput = document.getElementById('job-id-input');
+            const checkInfoBtn = document.getElementById('check-info-btn');
+            const getResultBtn = document.getElementById('get-result-btn');
+            const jobInfoDisplay = document.getElementById('job-info-display');
+            const resultDisplay = document.getElementById('result-display');
+            const errorDisplay = document.getElementById('error-display');
+
+            // ---------- Вспомогательные функции ----------
+            function clearError() { errorDisplay.innerHTML = ''; }
+            function showError(text) { errorDisplay.innerHTML = `<div class="error-msg">❌ ${text}</div>`; }
+            function showSuccess(text) { errorDisplay.innerHTML = `<div class="success-msg">✅ ${text}</div>`; }
+
+            // Загрузка корневого описания
+            async function loadRootInfo() {
+                try {
+                    const res = await fetch('/');
+                    if (!res.ok) throw new Error(`Ошибка ${res.status}`);
+                    const data = await res.json();
+                    rootDesc.textContent = `${data.Name || 'Сервис'} — ${data.Description || ''}`;
+                } catch (e) {
+                    rootDesc.textContent = 'Система кластеризации медицинских документов';
+                    console.warn('Не удалось загрузить /', e);
+                }
+            }
+
+            // ---------- Рендеринг полей гиперпараметров ----------
+            function renderClusteringParams(algo) {
+                let html = '<div style="margin-bottom:0.5rem; font-weight:500; color:#a5b4cb;">⚙️ Параметры алгоритма</div><div class="param-grid">';
+                if (algo === 'kmeans') {
+                    html += `
+                    <div><label>n_clusters (число кластеров)</label><input type="number" id="kmeans-n_clusters" value="8" min="1" step="1"></div>
+                    <div><label>max_iter (макс. итераций)</label><input type="number" id="kmeans-max_iter" value="300" min="1" step="1"></div>
+                    <div><label>tol (допуск)</label><input type="number" id="kmeans-tol" value="0.0001" min="0" step="0.0001"></div>
+                    <div><label>algorithm</label>
+                        <select id="kmeans-algorithm">
+                            <option value="lloyd" selected>lloyd</option>
+                            <option value="elkan">elkan</option>
+                            <option value="auto">auto</option>
+                            <option value="full">full</option>
+                        </select>
+                    </div>
+                `;
+                } else { // spectral
+                    html += `
+                    <div><label>n_clusters (число кластеров)</label><input type="number" id="spectral-n_clusters" value="8" min="1" step="1"></div>
+                    <div><label>n_init (число инициализаций)</label><input type="number" id="spectral-n_init" value="10" min="1" step="1"></div>
+                    <div><label>gamma (γ для ядра)</label><input type="number" id="spectral-gamma" value="1" min="0" step="0.1"></div>
+                    <div><label>n_neighbors (число соседей)</label><input type="number" id="spectral-n_neighbors" value="10" min="1" step="1"></div>
+                    <div><label>assign_labels</label>
+                        <select id="spectral-assign_labels">
+                            <option value="kmeans" selected>kmeans</option>
+                            <option value="discretize">discretize</option>
+                            <option value="cluster_qr">cluster_qr</option>
+                        </select>
+                    </div>
+                    <div><label>degree (степень полинома)</label><input type="number" id="spectral-degree" value="3" min="0" step="0.1"></div>
+                    <div><label>coef0 (свободный член)</label><input type="number" id="spectral-coef0" value="1" min="0" step="0.1"></div>
+                `;
+                }
+                html += '</div>';
+                clusteringParamsContainer.innerHTML = html;
+            }
+
+            function renderEmbeddingsParams(method) {
+                let html = '<div style="margin-bottom:0.5rem; font-weight:500; color:#a5b4cb;">📐 Параметры эмбеддингов</div><div class="param-grid">';
+                if (method === 'tfidf') {
+                    html += `
+                    <div><label>max_df</label><input type="number" id="tfidf-max_df" value="1.0" min="0" max="1" step="0.1"></div>
+                    <div><label>min_df</label><input type="number" id="tfidf-min_df" value="1.0" min="0" max="1" step="0.1"></div>
+                `;
+                } else if (method === 'word2vec') {
+                    html += `<div><label>alpha (скорость обучения)</label><input type="number" id="w2v-alpha" value="0.025" min="0" step="0.001"></div>`;
+                } else if (method === 'doc2vec') {
+                    html += `<div><label>alpha (скорость обучения)</label><input type="number" id="d2v-alpha" value="0.025" min="0" step="0.001"></div>`;
+                } else { // fasttext
+                    html += `
+                    <div style="grid-column:1/-1;">
+                        <label>Параметры FastText (JSON)</label>
+                        <textarea id="fasttext-json" rows="3">{"lr": 0.05, "dim": 100, "ws": 5, "epoch": 5}</textarea>
+                        <div class="hint">Введите JSON с параметрами FastText</div>
+                    </div>
+                `;
+                }
+                html += '</div>';
+                embeddingsParamsContainer.innerHTML = html;
+            }
+
+            // Обновление при изменении select'ов
+            function updateParamForms() {
+                renderClusteringParams(clusteringAlgoSelect.value);
+                renderEmbeddingsParams(embeddingsMethodSelect.value);
+            }
+
+            clusteringAlgoSelect.addEventListener('change', updateParamForms);
+            embeddingsMethodSelect.addEventListener('change', updateParamForms);
+
+            // Инициализация начальных форм
+            updateParamForms();
+
+            // ---------- Сбор параметров для отправки ----------
+            function collectClusteringHyperparams() {
+                const algo = clusteringAlgoSelect.value;
+                if (algo === 'kmeans') {
+                    return {
+                        n_clusters: parseInt(document.getElementById('kmeans-n_clusters').value) || 8,
+                        max_iter: parseInt(document.getElementById('kmeans-max_iter').value) || 300,
+                        tol: parseFloat(document.getElementById('kmeans-tol').value) || 0.0001,
+                        algorithm: document.getElementById('kmeans-algorithm').value
+                    };
+                } else {
+                    return {
+                        n_clusters: parseInt(document.getElementById('spectral-n_clusters').value) || 8,
+                        n_init: parseInt(document.getElementById('spectral-n_init').value) || 10,
+                        gamma: parseFloat(document.getElementById('spectral-gamma').value) || 1.0,
+                        n_neighbors: parseInt(document.getElementById('spectral-n_neighbors').value) || 10,
+                        assign_labels: document.getElementById('spectral-assign_labels').value,
+                        degree: parseFloat(document.getElementById('spectral-degree').value) || 3.0,
+                        coef0: parseFloat(document.getElementById('spectral-coef0').value) || 1.0
+                    };
+                }
+            }
+
+            function collectEmbeddingsHyperparams() {
+                const method = embeddingsMethodSelect.value;
+                if (method === 'tfidf') {
+                    return {
+                        max_df: parseFloat(document.getElementById('tfidf-max_df').value) || 1.0,
+                        min_df: parseFloat(document.getElementById('tfidf-min_df').value) || 1.0
+                    };
+                } else if (method === 'word2vec') {
+                    return { alpha: parseFloat(document.getElementById('w2v-alpha').value) || 0.025 };
+                } else if (method === 'doc2vec') {
+                    return { alpha: parseFloat(document.getElementById('d2v-alpha').value) || 0.025 };
+                } else { // fasttext
+                    try {
+                        return JSON.parse(document.getElementById('fasttext-json').value.trim() || '{}');
+                    } catch (e) {
+                        throw new Error('Ошибка в JSON параметров FastText: ' + e.message);
+                    }
+                }
+            }
+
+            // ---------- Отправка формы ----------
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                clearError();
+                jobCreatedInfo.innerHTML = '';
+                formStatus.textContent = '⏳ Отправка...';
+
+                let clusteringParams, embeddingsParams;
+                try {
+                    clusteringParams = collectClusteringHyperparams();
+                } catch (err) {
+                    showError(err.message);
+                    formStatus.textContent = '';
+                    return;
+                }
+                try {
+                    embeddingsParams = collectEmbeddingsHyperparams();
+                } catch (err) {
+                    showError(err.message);
+                    formStatus.textContent = '';
+                    return;
+                }
+
+                const payload = {
+                    dataset_id: datasetSelect.value,
+                    clustering_algo: clusteringAlgoSelect.value,
+                    embeddings_method: embeddingsMethodSelect.value,
+                    clustering_hyperparams: clusteringParams,
+                    embeddings_hyperparams: embeddingsParams
+                };
+
+                try {
+                    const response = await fetch('/perform_clustering', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        const detail = data.detail || `Ошибка ${response.status}`;
+                        throw new Error(detail);
+                    }
+
+                    const jobId = data.job_id;
+                    if (jobId) {
+                        jobCreatedInfo.innerHTML = `<div class="success-msg">✅ Задача принята! ID задачи: <strong>${jobId}</strong></div>`;
+                        jobIdInput.value = jobId;
+                        formStatus.textContent = 'Готово';
+                        jobInfoDisplay.innerHTML = `<p style="color:#94a3b8;">Используйте ID задачи для проверки статуса</p>`;
+                        resultDisplay.innerHTML = '';
+                    } else {
+                        jobCreatedInfo.innerHTML = `<div class="success-msg">✅ Задача принята, но ID задачи не получен</div>`;
+                    }
+                } catch (err) {
+                    showError(err.message);
+                    formStatus.textContent = 'Ошибка';
+                } finally {
+                    if (formStatus.textContent === '⏳ Отправка...') formStatus.textContent = '';
+                }
+            });
+
+            // ---------- Запрос информации о задаче ----------
+            async function fetchJobInfo(jobId) {
+                if (!jobId) throw new Error('Введите ID задачи');
+                const res = await fetch(`/job_info/${encodeURIComponent(jobId)}`);
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.detail || `Ошибка ${res.status}`);
+                return data;
+            }
+
+            async function handleCheckInfo() {
+                const jobId = jobIdInput.value.trim();
+                if (!jobId) { showError('Введите ID задачи'); return; }
+                clearError();
+                jobInfoDisplay.innerHTML = '<p>⏳ Загрузка...</p>';
+                resultDisplay.innerHTML = '';
+
+                try {
+                    const info = await fetchJobInfo(jobId);
+                    const status = info.status || 'unknown';
+                    const statusClass =
+                        status === 'waiting' ? 'status-waiting' :
+                            status === 'running' ? 'status-running' :
+                                status === 'done' ? 'status-done' :
+                                    status === 'failed' ? 'status-failed' : '';
+
+                    const statusText =
+                        status === 'waiting' ? 'ОЖИДАНИЕ' :
+                            status === 'running' ? 'ВЫПОЛНЯЕТСЯ' :
+                                status === 'done' ? 'ГОТОВО' :
+                                    status === 'failed' ? 'ОШИБКА' : status.toUpperCase();
+
+                    let html = `
+                    <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                        <span class="status-chip ${statusClass}">📌 ${statusText}</span>
+                        <span><strong>Датасет:</strong> ${info.dataset_id || '—'}</span>
+                        <span><strong>Алгоритм:</strong> ${info.clustering_algo || '—'}</span>
+                        <span><strong>Эмбеддинги:</strong> ${info.embeddings_method || '—'}</span>
+                    </div>
+                `;
+
+                    if (info.clustering_hyperparams || info.embeddings_hyperparams) {
+                        html += `<div style="margin-top: 1.2rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div><strong>🧪 Параметры кластеризации</strong><pre>${JSON.stringify(info.clustering_hyperparams, null, 2)}</pre></div>
+                        <div><strong>📊 Параметры эмбеддингов</strong><pre>${JSON.stringify(info.embeddings_hyperparams, null, 2)}</pre></div>
+                    </div>`;
+                    }
+
+                    jobInfoDisplay.innerHTML = html;
+                    showSuccess(`Статус задачи ${jobId}: ${statusText}`);
+                } catch (err) {
+                    jobInfoDisplay.innerHTML = `<p style="color:#fca5a5;">Не удалось получить информацию</p>`;
+                    showError(err.message);
+                }
+            }
+
+            async function handleGetResult() {
+                const jobId = jobIdInput.value.trim();
+                if (!jobId) { showError('Введите ID задачи'); return; }
+                clearError();
+                resultDisplay.innerHTML = '<p>⏳ Проверка готовности результата...</p>';
+
+                try {
+                    const info = await fetchJobInfo(jobId);
+                    if (info.status !== 'done') {
+                        resultDisplay.innerHTML = '';
+                        throw new Error(`Результат ещё не готов. Текущий статус: ${info.status || 'неизвестен'}`);
+                    }
+
+                    const res = await fetch(`/job_result/${encodeURIComponent(jobId)}`);
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) throw new Error(data.detail || `Ошибка ${res.status}`);
+
+                    const downloadUrl = data.download_url;
+                    if (downloadUrl) {
+                        resultDisplay.innerHTML = `
+                        <div class="success-msg" style="display: flex; align-items: center; justify-content: space-between;">
+                            <span>✅ Результат готов!</span>
+                            <a href="${downloadUrl}" target="_blank" class="download-link">📥 Скачать CSV</a>
+                        </div>
+                    `;
+                        if (!jobInfoDisplay.innerHTML.includes('status-done')) {
+                            jobInfoDisplay.innerHTML = `<div><span class="status-chip status-done">📌 ГОТОВО</span> (обновлено)</div>` + jobInfoDisplay.innerHTML;
+                        }
+                    } else {
+                        throw new Error('Ссылка на скачивание не получена');
+                    }
+                } catch (err) {
+                    resultDisplay.innerHTML = '';
+                    showError(err.message);
+                }
+            }
+
+            checkInfoBtn.addEventListener('click', (e) => { e.preventDefault(); handleCheckInfo(); });
+            getResultBtn.addEventListener('click', (e) => { e.preventDefault(); handleGetResult(); });
+
+            loadRootInfo();
+        })();
+    </script>
+</body>
+
+</html>

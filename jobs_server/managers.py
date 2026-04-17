@@ -1,17 +1,13 @@
-import asyncio
-import io
 import os
-from contextlib import asynccontextmanager
+import sys
 
 import pandas as pd
 import numpy as np
 
 from common.s3_operations import *
+from common.redis_operations import *
 
 from redis import Redis
-
-import pyarrow.parquet as pq
-
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from gensim.models import Word2Vec
@@ -24,18 +20,6 @@ from sklearn.cluster import KMeans, SpectralClustering
 
 REDIS_HOST = os.getenv("REDIS_HOST", "redis")
 REDIS_PORT = os.getenv("REDIS_PORT", "6379")
-
-
-# ----------------------------------- Функции управления Redis -------------------------------------
-def write_dataframe_to_redis(df: pd.DataFrame, key: str, redis_conn: Redis):
-    buffer = io.BytesIO()
-    df.to_parquet(buffer, engine="pyarrow", compression="snappy")
-    redis_conn.set(key, buffer.getvalue())
-
-
-def read_dataframe_from_redis(key: str, redis_conn: Redis) -> pd.DataFrame:
-    data = redis_conn.get(key)
-    return pd.read_parquet(io.BytesIO(data), engine="pyarrow")
 
 
 # ----------------------------------- Функции вычисления эмбеддингов -------------------------------
@@ -127,8 +111,23 @@ def cluster_spectral(data, cluster_params):
 
 
 clusterizers = {"kmeans": cluster_kmeans, "spectral": cluster_spectral}
+# TODO
+# графически изобразить
+# выдавать картинку через s3
+# нужен веб интерфейс
+# просто страницу описать на js(react)
+
+# TODO
+# добавить авторизацию
+
+# TODO
+# ассоциировать responses с пользователями
+#   отдельная база данных для пользовательских данных (можно хранить на main_server)
+#   в эту базу логировать все пользовательские запросы (их действия)
 
 
+# TODO
+# для S3 хранилища сделать удаленный сервер
 # ----------------------------------- Классы менеджеров ------------------------------------------
 def get_hash(embeddings_key: tuple):
     return " ".join(map(str, embeddings_key))
@@ -136,41 +135,55 @@ def get_hash(embeddings_key: tuple):
 
 class EmbeddingsCacheManager:
     embeddings_cache = None
+    jobs_pool = None
 
     def __init__(self):
         self.embeddings_cache = Redis(host=REDIS_HOST, port=REDIS_PORT, db=0)
+        self.jobs_pool = Redis(
+            host=REDIS_HOST, port=REDIS_PORT, db=1, decode_responses=True
+        )
 
     def have_embeddings(self, embeddings_key: tuple) -> bool:
         embeddings_key_hash = get_hash(embeddings_key)
-        if self.embeddings_cache.get(embeddings_key_hash) is None:
-            return False
-        return True
+        data = self.embeddings_cache.get(embeddings_key_hash)
+        return data is not None and len(data) > 0
 
-    def make_ready(self, embeddings_key: tuple):
+    def make_ready(self, embeddings_key: tuple, job_id: str):
         if not self.have_embeddings(embeddings_key):
-            self.calculate_embeddings(embeddings_key)
+            self.calculate_embeddings(embeddings_key, job_id)
 
-    def calculate_embeddings(self, embeddings_key: tuple):
+    def calculate_embeddings(self, embeddings_key: tuple, job_id: str):
         dataset_id, embeddings_method, embeddings_hyperparams = embeddings_key
 
-        dataset = read_dataframe_from_s3(S3_BUCKET_DATASETS, f"{dataset_id}.csv")
-        print(dataset.head())
-        vectorizer = vectorizers[embeddings_method]
-        dataset_vectorized = vectorizer(dataset, embeddings_hyperparams)
+        try:
+            dataset = read_dataframe_from_s3(S3_BUCKET_DATASETS, f"{dataset_id}.csv")
+            print(dataset.head())
+            vectorizer = vectorizers[embeddings_method]
+            dataset_vectorized = vectorizer(dataset, embeddings_hyperparams)
 
-        embeddings_key_hash = get_hash(embeddings_key)
-        write_dataframe_to_redis(
-            dataset_vectorized, embeddings_key_hash, self.embeddings_cache
-        )
+            embeddings_key_hash = get_hash(embeddings_key)
+            print(f"write: {embeddings_key_hash}", flush=True)
+            sys.stdout.flush()
+            write_dataframe_to_redis(
+                dataset_vectorized, embeddings_key_hash, self.embeddings_cache
+            )
+        except:
+            update_job_status(self.jobs_pool, job_id, "failed (calculate_embeddings)")
 
     def get(self, embeddings_key: str) -> pd.DataFrame:
         embeddings_key_hash = get_hash(embeddings_key)
+        print(f"get: {embeddings_key_hash}", flush=True)
+        sys.stdout.flush()
         return read_dataframe_from_redis(embeddings_key_hash, self.embeddings_cache)
 
 
 class ClusteringManager:
+    jobs_pool = None
+
     def __init__(self):
-        return
+        self.jobs_pool = Redis(
+            host=REDIS_HOST, port=REDIS_PORT, db=1, decode_responses=True
+        )
 
     def find_clusters(
         self,
@@ -181,6 +194,9 @@ class ClusteringManager:
     ):
         clusterizer = clusterizers[clustering_method]
         print(data.head())
-        data_clustered = clusterizer(data, clustering_hyperparams)
+        try:
+            data_clustered = clusterizer(data, clustering_hyperparams)
 
-        write_dataframe_to_s3(data_clustered, S3_BUCKET_RESULTS, job_id)
+            write_dataframe_to_s3(data_clustered, S3_BUCKET_RESULTS, job_id)
+        except:
+            update_job_status(self.jobs_pool, job_id, "failed (find_clusters)")
