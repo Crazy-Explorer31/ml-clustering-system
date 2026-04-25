@@ -293,20 +293,6 @@
             background: #1e293b;
             color: #f1f5f9;
         }
-
-        .param-group {
-            background: #1a2536;
-            border-radius: 16px;
-            padding: 1rem;
-            margin-top: 0.75rem;
-            border: 1px solid #2d3a4e;
-        }
-
-        .param-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 1rem;
-        }
     </style>
 </head>
 
@@ -324,40 +310,36 @@
             <form id="clustering-form">
                 <div class="form-grid">
                     <div class="full-width">
-                        <label>📁 Датасет</label>
-                        <select id="dataset-id">
-                            <option value="data" selected>data (основной набор)</option>
-                        </select>
-                        <div class="hint">Выберите датасет для кластеризации</div>
+                        <label>📁 ID датасета <span style="font-weight: normal;">(обязательно)</span></label>
+                        <input type="text" id="dataset-id" placeholder="например: ds_med_001" required>
                     </div>
                     <div>
                         <label>🧩 Алгоритм кластеризации</label>
                         <select id="clustering-algo">
-                            <option value="kmeans" selected>k-means</option>
+                            <option value="kmeans">k-means</option>
                             <option value="spectral">spectral</option>
                         </select>
                     </div>
                     <div>
                         <label>🔤 Метод эмбеддингов</label>
                         <select id="embeddings-method">
-                            <option value="tfidf" selected>TF-IDF</option>
+                            <option value="tfidf">TF-IDF</option>
                             <option value="word2vec">Word2Vec</option>
                             <option value="fasttext">FastText</option>
                             <option value="doc2vec">Doc2Vec</option>
                         </select>
                     </div>
-                </div>
-
-                <!-- Динамические блоки гиперпараметров -->
-                <div class="full-width" style="margin-top: 1rem;">
-                    <div id="clustering-params-container" class="param-group">
-                        <!-- здесь будут поля для алгоритма кластеризации -->
+                    <div>
+                        <label>⚙️ Гиперпараметры кластеризации (JSON)</label>
+                        <textarea id="clustering-hyperparams">{"n_clusters": 5, "random_state": 42}</textarea>
+                        <div class="hint">Пример: {"n_clusters": 5, "eps": 0.5}</div>
                     </div>
-                    <div id="embeddings-params-container" class="param-group" style="margin-top: 1rem;">
-                        <!-- здесь будут поля для метода эмбеддингов -->
+                    <div>
+                        <label>📐 Гиперпараметры эмбеддингов (JSON)</label>
+                        <textarea id="embeddings-hyperparams">{"vector_size": 100, "window": 5}</textarea>
+                        <div class="hint">Пример: {"vector_size": 100, "min_count": 2}</div>
                     </div>
                 </div>
-
                 <div class="action-bar">
                     <button type="submit" class="btn">🚀 Отправить задачу</button>
                     <span id="form-status" style="color:#94a3b8;"></span>
@@ -383,6 +365,7 @@
                 </div>
             </div>
 
+            <!-- Область вывода информации -->
             <div id="job-info-display" class="info-box">
                 <p style="color: #94a3b8; margin:0;">Введите ID задачи и нажмите «Статус»</p>
             </div>
@@ -401,11 +384,11 @@
             // ---------- DOM элементы ----------
             const rootDesc = document.getElementById('root-description');
             const form = document.getElementById('clustering-form');
-            const datasetSelect = document.getElementById('dataset-id');
+            const datasetIdInput = document.getElementById('dataset-id');
             const clusteringAlgoSelect = document.getElementById('clustering-algo');
             const embeddingsMethodSelect = document.getElementById('embeddings-method');
-            const clusteringParamsContainer = document.getElementById('clustering-params-container');
-            const embeddingsParamsContainer = document.getElementById('embeddings-params-container');
+            const clusteringHyperparamsText = document.getElementById('clustering-hyperparams');
+            const embeddingsHyperparamsText = document.getElementById('embeddings-hyperparams');
             const formStatus = document.getElementById('form-status');
             const jobCreatedInfo = document.getElementById('job-created-info');
             const jobIdInput = document.getElementById('job-id-input');
@@ -415,12 +398,18 @@
             const resultDisplay = document.getElementById('result-display');
             const errorDisplay = document.getElementById('error-display');
 
-            // ---------- Вспомогательные функции ----------
-            function clearError() { errorDisplay.innerHTML = ''; }
-            function showError(text) { errorDisplay.innerHTML = `<div class="error-msg">❌ ${text}</div>`; }
-            function showSuccess(text) { errorDisplay.innerHTML = `<div class="success-msg">✅ ${text}</div>`; }
+            // Вспомогательные функции очистки сообщений
+            function clearError() {
+                errorDisplay.innerHTML = '';
+            }
+            function showError(text) {
+                errorDisplay.innerHTML = `<div class="error-msg">❌ ${text}</div>`;
+            }
+            function showSuccess(text) {
+                errorDisplay.innerHTML = `<div class="success-msg">✅ ${text}</div>`;
+            }
 
-            // Загрузка корневого описания
+            // Загрузка описания с корневого эндпоинта
             async function loadRootInfo() {
                 try {
                     const res = await fetch('/');
@@ -433,148 +422,32 @@
                 }
             }
 
-            // ---------- Рендеринг полей гиперпараметров ----------
-            function renderClusteringParams(algo) {
-                let html = '<div style="margin-bottom:0.5rem; font-weight:500; color:#a5b4cb;">⚙️ Параметры алгоритма</div><div class="param-grid">';
-                if (algo === 'kmeans') {
-                    html += `
-                    <div><label>n_clusters (число кластеров)</label><input type="number" id="kmeans-n_clusters" value="8" min="1" step="1"></div>
-                    <div><label>max_iter (макс. итераций)</label><input type="number" id="kmeans-max_iter" value="300" min="1" step="1"></div>
-                    <div><label>tol (допуск)</label><input type="number" id="kmeans-tol" value="0.0001" min="0" step="0.0001"></div>
-                    <div><label>algorithm</label>
-                        <select id="kmeans-algorithm">
-                            <option value="lloyd" selected>lloyd</option>
-                            <option value="elkan">elkan</option>
-                            <option value="auto">auto</option>
-                            <option value="full">full</option>
-                        </select>
-                    </div>
-                `;
-                } else { // spectral
-                    html += `
-                    <div><label>n_clusters (число кластеров)</label><input type="number" id="spectral-n_clusters" value="8" min="1" step="1"></div>
-                    <div><label>n_init (число инициализаций)</label><input type="number" id="spectral-n_init" value="10" min="1" step="1"></div>
-                    <div><label>gamma (γ для ядра)</label><input type="number" id="spectral-gamma" value="1" min="0" step="0.1"></div>
-                    <div><label>n_neighbors (число соседей)</label><input type="number" id="spectral-n_neighbors" value="10" min="1" step="1"></div>
-                    <div><label>assign_labels</label>
-                        <select id="spectral-assign_labels">
-                            <option value="kmeans" selected>kmeans</option>
-                            <option value="discretize">discretize</option>
-                            <option value="cluster_qr">cluster_qr</option>
-                        </select>
-                    </div>
-                    <div><label>degree (степень полинома)</label><input type="number" id="spectral-degree" value="3" min="0" step="0.1"></div>
-                    <div><label>coef0 (свободный член)</label><input type="number" id="spectral-coef0" value="1" min="0" step="0.1"></div>
-                `;
-                }
-                html += '</div>';
-                clusteringParamsContainer.innerHTML = html;
-            }
-
-            function renderEmbeddingsParams(method) {
-                let html = '<div style="margin-bottom:0.5rem; font-weight:500; color:#a5b4cb;">📐 Параметры эмбеддингов</div><div class="param-grid">';
-                if (method === 'tfidf') {
-                    html += `
-                    <div><label>max_df</label><input type="number" id="tfidf-max_df" value="1.0" min="0" max="1" step="0.1"></div>
-                    <div><label>min_df</label><input type="number" id="tfidf-min_df" value="1.0" min="0" max="1" step="0.1"></div>
-                `;
-                } else if (method === 'word2vec') {
-                    html += `<div><label>alpha (скорость обучения)</label><input type="number" id="w2v-alpha" value="0.025" min="0" step="0.001"></div>`;
-                } else if (method === 'doc2vec') {
-                    html += `<div><label>alpha (скорость обучения)</label><input type="number" id="d2v-alpha" value="0.025" min="0" step="0.001"></div>`;
-                } else { // fasttext
-                    html += `
-                    <div style="grid-column:1/-1;">
-                        <label>Параметры FastText (JSON)</label>
-                        <textarea id="fasttext-json" rows="3">{"lr": 0.05, "dim": 100, "ws": 5, "epoch": 5}</textarea>
-                        <div class="hint">Введите JSON с параметрами FastText</div>
-                    </div>
-                `;
-                }
-                html += '</div>';
-                embeddingsParamsContainer.innerHTML = html;
-            }
-
-            // Обновление при изменении select'ов
-            function updateParamForms() {
-                renderClusteringParams(clusteringAlgoSelect.value);
-                renderEmbeddingsParams(embeddingsMethodSelect.value);
-            }
-
-            clusteringAlgoSelect.addEventListener('change', updateParamForms);
-            embeddingsMethodSelect.addEventListener('change', updateParamForms);
-
-            // Инициализация начальных форм
-            updateParamForms();
-
-            // ---------- Сбор параметров для отправки ----------
-            function collectClusteringHyperparams() {
-                const algo = clusteringAlgoSelect.value;
-                if (algo === 'kmeans') {
-                    return {
-                        n_clusters: parseInt(document.getElementById('kmeans-n_clusters').value) || 8,
-                        max_iter: parseInt(document.getElementById('kmeans-max_iter').value) || 300,
-                        tol: parseFloat(document.getElementById('kmeans-tol').value) || 0.0001,
-                        algorithm: document.getElementById('kmeans-algorithm').value
-                    };
-                } else {
-                    return {
-                        n_clusters: parseInt(document.getElementById('spectral-n_clusters').value) || 8,
-                        n_init: parseInt(document.getElementById('spectral-n_init').value) || 10,
-                        gamma: parseFloat(document.getElementById('spectral-gamma').value) || 1.0,
-                        n_neighbors: parseInt(document.getElementById('spectral-n_neighbors').value) || 10,
-                        assign_labels: document.getElementById('spectral-assign_labels').value,
-                        degree: parseFloat(document.getElementById('spectral-degree').value) || 3.0,
-                        coef0: parseFloat(document.getElementById('spectral-coef0').value) || 1.0
-                    };
-                }
-            }
-
-            function collectEmbeddingsHyperparams() {
-                const method = embeddingsMethodSelect.value;
-                if (method === 'tfidf') {
-                    return {
-                        max_df: parseFloat(document.getElementById('tfidf-max_df').value) || 1.0,
-                        min_df: parseFloat(document.getElementById('tfidf-min_df').value) || 1.0
-                    };
-                } else if (method === 'word2vec') {
-                    return { alpha: parseFloat(document.getElementById('w2v-alpha').value) || 0.025 };
-                } else if (method === 'doc2vec') {
-                    return { alpha: parseFloat(document.getElementById('d2v-alpha').value) || 0.025 };
-                } else { // fasttext
-                    try {
-                        return JSON.parse(document.getElementById('fasttext-json').value.trim() || '{}');
-                    } catch (e) {
-                        throw new Error('Ошибка в JSON параметров FastText: ' + e.message);
-                    }
-                }
-            }
-
-            // ---------- Отправка формы ----------
+            // Отправка формы кластеризации
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 clearError();
                 jobCreatedInfo.innerHTML = '';
                 formStatus.textContent = '⏳ Отправка...';
 
+                // Валидация JSON
                 let clusteringParams, embeddingsParams;
                 try {
-                    clusteringParams = collectClusteringHyperparams();
+                    clusteringParams = JSON.parse(clusteringHyperparamsText.value.trim() || '{}');
                 } catch (err) {
-                    showError(err.message);
+                    showError('Ошибка в JSON гиперпараметров кластеризации: ' + err.message);
                     formStatus.textContent = '';
                     return;
                 }
                 try {
-                    embeddingsParams = collectEmbeddingsHyperparams();
+                    embeddingsParams = JSON.parse(embeddingsHyperparamsText.value.trim() || '{}');
                 } catch (err) {
-                    showError(err.message);
+                    showError('Ошибка в JSON гиперпараметров эмбеддингов: ' + err.message);
                     formStatus.textContent = '';
                     return;
                 }
 
                 const payload = {
-                    dataset_id: datasetSelect.value,
+                    dataset_id: datasetIdInput.value.trim(),
                     clustering_algo: clusteringAlgoSelect.value,
                     embeddings_method: embeddingsMethodSelect.value,
                     clustering_hyperparams: clusteringParams,
@@ -594,11 +467,13 @@
                         throw new Error(detail);
                     }
 
+                    // Успех: 202 Accepted, ожидаем job_id
                     const jobId = data.job_id;
                     if (jobId) {
                         jobCreatedInfo.innerHTML = `<div class="success-msg">✅ Задача принята! ID задачи: <strong>${jobId}</strong></div>`;
-                        jobIdInput.value = jobId;
+                        jobIdInput.value = jobId;  // автозаполнение поля для удобства
                         formStatus.textContent = 'Готово';
+                        // Очищаем старую информацию
                         jobInfoDisplay.innerHTML = `<p style="color:#94a3b8;">Используйте ID задачи для проверки статуса</p>`;
                         resultDisplay.innerHTML = '';
                     } else {
@@ -612,24 +487,31 @@
                 }
             });
 
-            // ---------- Запрос информации о задаче ----------
+            // Функция запроса информации о задаче
             async function fetchJobInfo(jobId) {
                 if (!jobId) throw new Error('Введите ID задачи');
                 const res = await fetch(`/job_info/${encodeURIComponent(jobId)}`);
                 const data = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(data.detail || `Ошибка ${res.status}`);
+                if (!res.ok) {
+                    throw new Error(data.detail || `Ошибка ${res.status}`);
+                }
                 return data;
             }
 
+            // Отображение информации о задаче
             async function handleCheckInfo() {
                 const jobId = jobIdInput.value.trim();
-                if (!jobId) { showError('Введите ID задачи'); return; }
+                if (!jobId) {
+                    showError('Введите ID задачи');
+                    return;
+                }
                 clearError();
                 jobInfoDisplay.innerHTML = '<p>⏳ Загрузка...</p>';
                 resultDisplay.innerHTML = '';
 
                 try {
                     const info = await fetchJobInfo(jobId);
+                    // Формируем красивый вывод
                     const status = info.status || 'unknown';
                     const statusClass =
                         status === 'waiting' ? 'status-waiting' :
@@ -652,6 +534,7 @@
                     </div>
                 `;
 
+                    // Гиперпараметры
                     if (info.clustering_hyperparams || info.embeddings_hyperparams) {
                         html += `<div style="margin-top: 1.2rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div><strong>🧪 Параметры кластеризации</strong><pre>${JSON.stringify(info.clustering_hyperparams, null, 2)}</pre></div>
@@ -667,22 +550,30 @@
                 }
             }
 
+            // Получение результата (ссылки)
             async function handleGetResult() {
                 const jobId = jobIdInput.value.trim();
-                if (!jobId) { showError('Введите ID задачи'); return; }
+                if (!jobId) {
+                    showError('Введите ID задачи');
+                    return;
+                }
                 clearError();
                 resultDisplay.innerHTML = '<p>⏳ Проверка готовности результата...</p>';
 
                 try {
+                    // Сначала проверяем статус через job_info
                     const info = await fetchJobInfo(jobId);
                     if (info.status !== 'done') {
                         resultDisplay.innerHTML = '';
                         throw new Error(`Результат ещё не готов. Текущий статус: ${info.status || 'неизвестен'}`);
                     }
 
+                    // Запрашиваем результат
                     const res = await fetch(`/job_result/${encodeURIComponent(jobId)}`);
                     const data = await res.json().catch(() => ({}));
-                    if (!res.ok) throw new Error(data.detail || `Ошибка ${res.status}`);
+                    if (!res.ok) {
+                        throw new Error(data.detail || `Ошибка ${res.status}`);
+                    }
 
                     const downloadUrl = data.download_url;
                     if (downloadUrl) {
@@ -692,6 +583,7 @@
                             <a href="${downloadUrl}" target="_blank" class="download-link">📥 Скачать CSV</a>
                         </div>
                     `;
+                        // Также обновим блок инфо, если там не показан статус done
                         if (!jobInfoDisplay.innerHTML.includes('status-done')) {
                             jobInfoDisplay.innerHTML = `<div><span class="status-chip status-done">📌 ГОТОВО</span> (обновлено)</div>` + jobInfoDisplay.innerHTML;
                         }
@@ -704,10 +596,19 @@
                 }
             }
 
-            checkInfoBtn.addEventListener('click', (e) => { e.preventDefault(); handleCheckInfo(); });
-            getResultBtn.addEventListener('click', (e) => { e.preventDefault(); handleGetResult(); });
+            // Обработчики кнопок
+            checkInfoBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                handleCheckInfo();
+            });
+            getResultBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                handleGetResult();
+            });
 
+            // При загрузке страницы получаем описание
             loadRootInfo();
+
         })();
     </script>
 </body>

@@ -26,7 +26,7 @@ from managers import *
 
 def run_clustering(job_params: dict):
     job_id = get_current_job().id
-    # job_id = "123"
+    # job_id = "123" # DEBUG
     update_job_status(jobs_pool, job_id, "running")
 
     embeddings_key = (
@@ -102,9 +102,9 @@ async def job_commit(job_info: ClusteringRequest):
     # Сохраняем данные о задаче
     save_job_state(jobs_pool, job.id, job_params | {"status": "waiting"})
 
-    # run_clustering(job_params)
-    # response = JobAcceptedResponse(job_id="123").model_dump()
-    # save_job_state(jobs_pool, "123", job_params | {"status": "waiting"})
+    # run_clustering(job_params) # DEBUG
+    # response_dict = JobAcceptedResponse(job_id="123").model_dump() # DEBUG
+    # save_job_state(jobs_pool, "123", job_params | {"status": "waiting"}) # DEBUG
 
     return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content=response_dict)
 

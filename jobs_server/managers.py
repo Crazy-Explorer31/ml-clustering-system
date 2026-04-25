@@ -24,7 +24,9 @@ REDIS_PORT = os.getenv("REDIS_PORT", "6379")
 
 # ----------------------------------- Функции вычисления эмбеддингов -------------------------------
 def tfidf_vectorize(data, vectorize_params):
-    vectorizer = TfidfVectorizer(**vectorize_params)
+    vectorizer = TfidfVectorizer(
+        **vectorize_params
+    )  # FIXME: криво передаются min/max_df
     X_tfidf = vectorizer.fit_transform(data.text)
     return pd.DataFrame(X_tfidf.toarray(), columns=vectorizer.get_feature_names_out())
 
@@ -169,6 +171,7 @@ class EmbeddingsCacheManager:
             )
         except:
             update_job_status(self.jobs_pool, job_id, "failed (calculate_embeddings)")
+            raise  # comment for release
 
     def get(self, embeddings_key: str) -> pd.DataFrame:
         embeddings_key_hash = get_hash(embeddings_key)
