@@ -244,7 +244,7 @@ async def job_result(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-app.mount("/ui", StaticFiles(directory="static", html=True), name="static")
+app.mount("/ui", StaticFiles(directory="main_ui", html=True), name="main_ui")
 
 
 @app.get("/authorised_users_ui", response_class=HTMLResponse)

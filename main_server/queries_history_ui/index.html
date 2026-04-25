@@ -4,8 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Redis Inspector • строки → словари</title>
-    <!-- Font Awesome 6 (Free) -->
+    <title>Queries history</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         * {
@@ -15,29 +14,27 @@
         }
 
         body {
-            background: linear-gradient(145deg, #f0f4fa 0%, #e9eef4 100%);
-            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: #12131c;
+            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
             padding: 2rem 1.5rem;
-            color: #1a2634;
+            color: #eef2ff;
+            font-size: 16px;
+            /* явно задаём базовый размер */
         }
 
-        /* fallback для Inter */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap');
-
         .container {
-            max-width: 1600px;
+            max-width: 1400px;
             margin: 0 auto;
         }
 
         /* хедер */
-        .dashboard-header {
-            background: rgba(255, 255, 255, 0.75);
+        .header {
+            background: rgba(25, 28, 40, 0.85);
             backdrop-filter: blur(12px);
-            border-radius: 2.5rem;
+            border-radius: 1.75rem;
             padding: 1.5rem 2rem;
             margin-bottom: 2rem;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(71, 85, 105, 0.5);
         }
 
         h1 {
@@ -46,29 +43,28 @@
             gap: 0.75rem;
             font-weight: 650;
             font-size: 1.9rem;
-            color: #0f2b3d;
-            letter-spacing: -0.3px;
+            /* чуть крупнее, как в карточном хедере */
+            color: #f0f3fa;
         }
 
         h1 i {
-            background: #dc2f2f;
-            background: linear-gradient(135deg, #dc2f2f, #b91c1c);
+            background: linear-gradient(135deg, #f97316, #dc2626);
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
-            font-size: 2rem;
         }
 
         .sub {
-            color: #4a5b6e;
-            margin-top: 0.5rem;
+            color: #a5b4cb;
+            margin-top: 0.4rem;
             font-size: 0.9rem;
-            border-left: 3px solid #dc2f2f;
+            /* увеличено с 0.85rem */
+            border-left: 3px solid #f97316;
             padding-left: 0.75rem;
         }
 
         /* панель управления */
-        .control-bar {
+        .toolbar {
             display: flex;
             flex-wrap: wrap;
             justify-content: space-between;
@@ -77,253 +73,227 @@
             margin-top: 1.5rem;
         }
 
-        .stats-badge {
-            background: #1e2f3f;
-            color: white;
-            padding: 0.3rem 1rem;
-            border-radius: 40px;
-            font-size: 0.85rem;
-            font-weight: 500;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .button-group {
-            display: flex;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-        }
-
-        .btn {
-            border: none;
-            background: white;
-            padding: 0.6rem 1.2rem;
+        .stats {
+            background: #1e2438;
             border-radius: 2rem;
-            font-weight: 500;
-            font-size: 0.85rem;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.6rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-            font-family: inherit;
-            border: 1px solid #e2e8f0;
+            padding: 0.4rem 1.2rem;
+            font-size: 0.9rem;
+            /* увеличено */
+            border: 1px solid #334155;
         }
 
-        .btn-primary {
-            background: #1e293b;
-            color: white;
-            border: none;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        .btn-primary:hover {
-            background: #0f172a;
-            transform: translateY(-1px);
-        }
-
-        .btn-outline {
-            background: transparent;
-            border: 1px solid #cbd5e1;
-        }
-
-        .btn-outline:hover {
-            background: #f1f5f9;
-            border-color: #94a3b8;
-        }
-
-        .search-wrapper {
+        .search-wrap {
             flex: 1;
-            min-width: 240px;
+            min-width: 220px;
             position: relative;
         }
 
-        .search-wrapper i {
+        .search-wrap i {
             position: absolute;
             left: 1rem;
             top: 50%;
             transform: translateY(-50%);
-            color: #7c8b9c;
-            font-size: 0.9rem;
+            color: #94a3b8;
         }
 
         #searchInput {
             width: 100%;
             padding: 0.7rem 1rem 0.7rem 2.5rem;
-            border-radius: 2.5rem;
-            border: 1px solid #ddd;
-            background: white;
-            font-size: 0.9rem;
-            transition: 0.2s;
-            font-family: inherit;
+            border-radius: 2rem;
+            border: 1px solid #2d374e;
+            background: #0f1119;
+            color: #f0f3fa;
+            font-size: 0.95rem;
+            /* увеличено */
         }
 
         #searchInput:focus {
+            border-color: #f97316;
             outline: none;
-            border-color: #dc2f2f;
-            box-shadow: 0 0 0 3px rgba(220, 47, 47, 0.2);
+            box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.3);
         }
 
-        /* сетка карточек */
-        .cards-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-            gap: 1.75rem;
-            margin-top: 1rem;
+        .btn {
+            background: #1e293b;
+            border: 1px solid #334155;
+            padding: 0.6rem 1.2rem;
+            border-radius: 2rem;
+            font-weight: 500;
+            font-size: 0.9rem;
+            /* увеличено */
+            color: #f1f5f9;
+            cursor: pointer;
+            transition: 0.2s;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
-        /* карточка ключа */
-        .redis-card {
-            background: white;
-            border-radius: 1.75rem;
-            box-shadow: 0 12px 28px -8px rgba(0, 0, 0, 0.08);
-            transition: all 0.25s ease;
+        .btn-primary {
+            background: #f97316;
+            border: none;
+            color: #0f0f1a;
+            font-weight: 600;
+        }
+
+        .btn-primary:hover {
+            background: #ea580c;
+            transform: translateY(-1px);
+        }
+
+        .btn-outline:hover {
+            background: #2d374e;
+        }
+
+        /* Блочная структура */
+        .keys-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .key-block {
+            background: #161b29;
+            border-radius: 1.5rem;
+            border: 1px solid #2a2f42;
             overflow: hidden;
-            border: 1px solid rgba(0, 0, 0, 0.03);
+        }
+
+        .block-header {
+            background: #10131f;
+            padding: 1rem 1.5rem;
+            /* увеличен отступ */
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #262e42;
+        }
+
+        .key-title {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-weight: 700;
+            font-size: 1.1rem;
+            /* как в карточках (было 1rem) */
+            color: #fdba74;
+            word-break: break-all;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            letter-spacing: -0.2px;
+        }
+
+        .copy-key-btn {
+            background: #262d40;
+            border: none;
+            color: #b9c3dd;
+            width: 30px;
+            height: 30px;
+            border-radius: 2rem;
+            cursor: pointer;
+            transition: 0.1s;
+        }
+
+        /* строки внутри блока */
+        .fields-list {
             display: flex;
             flex-direction: column;
         }
 
-        .redis-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 22px 32px -12px rgba(0, 0, 0, 0.12);
-        }
-
-        .card-header {
-            background: #fef9f5;
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid #f0e7df;
+        .field-row {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            gap: 0.5rem;
+            padding: 0.85rem 1.5rem;
+            /* увеличены внутренние отступы */
+            border-bottom: 1px solid #1f253b;
+            gap: 1rem;
         }
 
-        .key-name {
-            font-weight: 700;
-            font-size: 1.1rem;
-            font-family: 'SF Mono', 'Fira Code', monospace;
-            background: #fff1e6;
-            padding: 0.2rem 0.7rem;
-            border-radius: 2rem;
-            color: #b13e2d;
-            word-break: break-all;
-            letter-spacing: -0.2px;
-        }
-
-        .copy-key {
-            background: transparent;
-            border: none;
-            font-size: 1rem;
-            color: #8f6f5c;
-            cursor: pointer;
-            transition: 0.1s;
-            padding: 0.3rem;
-            border-radius: 2rem;
-            width: 28px;
-            height: 28px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .copy-key:hover {
-            background: #e9dbd1;
-            color: #c2410c;
-        }
-
-        .dict-body {
-            padding: 1.25rem 1.5rem 1.5rem;
-            flex: 1;
-        }
-
-        .dict-item {
-            display: flex;
-            border-bottom: 1px dashed #edf2f7;
-            padding: 0.6rem 0;
-            font-size: 0.85rem;
-            align-items: flex-start;
-            gap: 0.75rem;
-        }
-
-        .dict-item:last-child {
+        .field-row:last-child {
             border-bottom: none;
         }
 
-        .dict-field {
-            width: 35%;
+        .field-name {
+            width: 28%;
             font-weight: 600;
-            color: #2c3e4e;
             font-family: monospace;
-            word-break: break-word;
-            background: #f8fafc;
-            padding: 0.2rem 0.4rem;
-            border-radius: 8px;
-        }
-
-        .dict-value {
-            width: 65%;
-            color: #1e2f3f;
-            word-break: break-word;
-            font-family: 'SF Mono', monospace;
-            background: #ffffff;
-            padding: 0.2rem 0.4rem;
-            border-radius: 8px;
-            white-space: pre-wrap;
-        }
-
-        .empty-dict {
-            text-align: center;
-            padding: 1rem;
-            color: #8ba0b0;
-            font-style: italic;
-            background: #f9fafc;
+            color: #cbd5e6;
+            background: #0f111c;
+            padding: 0.3rem 0.7rem;
+            /* больше воздуха */
             border-radius: 1rem;
-            font-size: 0.85rem;
+            word-break: break-word;
+            font-size: 0.95rem;
+            /* было 0.85rem – увеличили */
         }
 
-        .badge-length {
-            font-size: 0.7rem;
-            background: #e9ecef;
-            border-radius: 30px;
-            padding: 0.2rem 0.6rem;
-            margin-left: 0.5rem;
-            font-weight: normal;
-        }
-
-        .loading-spinner {
+        .field-value-wrapper {
+            width: 72%;
             display: flex;
-            justify-content: center;
             align-items: center;
+            gap: 0.6rem;
+        }
+
+        .field-value {
+            flex: 1;
+            font-family: monospace;
+            color: #e2e8f0;
+            word-break: break-word;
+            white-space: pre-wrap;
+            background: #0e111b;
+            padding: 0.3rem 0.7rem;
+            border-radius: 1rem;
+            font-size: 0.95rem;
+            /* было 0.85rem – увеличили */
+            line-height: 1.4;
+            /* улучшает читаемость */
+        }
+
+        .copy-value-btn {
+            background: #262d40;
+            border: none;
+            color: #b9c3dd;
+            width: 28px;
+            height: 28px;
+            border-radius: 2rem;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: 0.1s;
+            flex-shrink: 0;
+        }
+
+        .copy-value-btn:hover {
+            background: #3b425a;
+            color: #f97316;
+        }
+
+        .empty-dict-placeholder {
+            padding: 1.2rem 1.5rem;
+            color: #8da0bc;
+            font-style: italic;
+            background: #0f121d;
+            text-align: center;
+            font-size: 0.95rem;
+        }
+
+        .loading,
+        .empty-message {
+            text-align: center;
             padding: 3rem;
-            gap: 0.8rem;
-            color: #4b5563;
-        }
-
-        .fa-spinner {
-            font-size: 1.8rem;
-        }
-
-        .info-message {
-            background: #eef2ff;
-            border-radius: 1.2rem;
-            padding: 0.7rem 1.2rem;
-            font-size: 0.8rem;
-            color: #1f2a44;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
+            background: #151a28;
+            border-radius: 1.5rem;
+            font-size: 1rem;
+            /* сделали крупнее */
         }
 
         footer {
             text-align: center;
-            margin-top: 3rem;
-            font-size: 0.75rem;
-            color: #5c6f87;
-            border-top: 1px solid #e2e8f0;
-            padding-top: 1.8rem;
+            margin-top: 2rem;
+            font-size: 0.85rem;
+            /* футер чуть крупнее */
+            color: #5f7292;
+            border-top: 1px solid #232a3f;
+            padding-top: 1.5rem;
         }
 
         @media (max-width: 700px) {
@@ -331,25 +301,19 @@
                 padding: 1rem;
             }
 
-            .cards-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .control-bar {
+            .field-row {
                 flex-direction: column;
                 align-items: stretch;
             }
 
-            .dict-field,
-            .dict-value {
-                width: auto;
+            .field-name,
+            .field-value-wrapper {
+                width: 100%;
             }
 
-            .dict-item {
-                flex-direction: column;
-                gap: 0.3rem;
-                border-bottom: 1px solid #eef2f6;
-                padding: 0.75rem 0;
+            .field-name,
+            .field-value {
+                font-size: 0.9rem;
             }
         }
     </style>
@@ -357,52 +321,31 @@
 
 <body>
     <div class="container">
-        <div class="dashboard-header">
-            <h1>
-                <i class="fas fa-database"></i>
-                Авторизованные пользователи
-            </h1>
-            <div class="sub">
-                Авторизованные пользователи
-            </div>
-
-            <div class="control-bar">
-                <div class="stats-badge" id="statsArea">
-                    <i class="fas fa-key"></i> <span id="totalKeys">0</span> ключей
-                    <span style="margin-left: 0.3rem;">•</span>
-                    <i class="fas fa-eye"></i> <span id="displayedKeys">0</span> отображено
+        <div class="header">
+            <h1><i class="fas fa-clock"></i> История запросов</h1>
+            <div class="sub">Данные принятых запросов в формате "время -> информация".</div>
+            <div class="toolbar">
+                <div class="stats">
+                    <span><i class="fas fa-database"></i> <span id="totalKeys">0</span> запросов</span>
                 </div>
-
-                <div class="search-wrapper">
+                <div class="search-wrap">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="searchInput" placeholder="Поиск по пользователям, значениям..."
-                        autocomplete="off">
+                    <input type="text" id="searchInput" placeholder="Поиск по значению...">
                 </div>
-
-                <div class="button-group">
-                    <button id="fetchApiBtn" class="btn btn-primary"><i class="fas fa-cloud-download-alt"></i> Загрузить
-                        из API</button>
-                    <button id="demoBtn" class="btn btn-outline"><i class="fas fa-flask"></i> Демо-данные</button>
+                <div class="actions">
+                    <button id="refreshBtn" class="btn btn-primary"><i class="fas fa-sync-alt"></i> Обновить</button>
                     <button id="clearSearchBtn" class="btn btn-outline"><i class="fas fa-times"></i> Сброс</button>
                 </div>
             </div>
         </div>
 
-        <div id="cardsContainer" class="cards-grid">
-            <!-- динамические карточки -->
-            <div class="loading-spinner" id="initialLoader">
-                <i class="fas fa-spinner fa-pulse"></i> Загрузка демонстрационных данных...
-            </div>
+        <div id="keysContainer" class="keys-list">
+            <div class="loading"><i class="fas fa-spinner fa-pulse"></i> Загрузка из Redis API...</div>
         </div>
-        <footer>
-            <i class="fas fa-plug"></i> Подключение к реальному Redis: настройте бэкенд, возвращающий JSON { "key1": {
-            "field": "value" }, ... } по эндпоинту <code
-                style="background:#e2e8f0; padding:2px 6px; border-radius:16px;">/get_queries_history</code>
-        </footer>
+        <footer><i class="fas fa-code-branch"></i> Данные из /get_queries_history · формат ключа: имя:timestamp</footer>
     </div>
 
     <script>
-        // ------ утилиты ------
         function escapeHtml(str) {
             if (!str) return '';
             return str.replace(/[&<>]/g, function (m) {
@@ -410,323 +353,228 @@
                 if (m === '<') return '&lt;';
                 if (m === '>') return '&gt;';
                 return m;
-            }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function (c) {
-                return c;
             });
         }
 
-        // глобальное состояние
-        let originalData = {};     // { "ключ": { "поле": "значение", ... } }
-        let currentFilterText = "";
+        let originalData = {};      // { key: {field: value, ...} }
+        let currentFilter = "";
 
-        // DOM элементы
-        const container = document.getElementById('cardsContainer');
+        const container = document.getElementById('keysContainer');
         const searchInput = document.getElementById('searchInput');
         const totalKeysSpan = document.getElementById('totalKeys');
-        const displayedKeysSpan = document.getElementById('displayedKeys');
-        const fetchApiBtn = document.getElementById('fetchApiBtn');
-        const demoBtn = document.getElementById('demoBtn');
+        const refreshBtn = document.getElementById('refreshBtn');
         const clearSearchBtn = document.getElementById('clearSearchBtn');
 
-        // функция глубокого поиска (ключ + все поля и значения) регистронезависимо
-        function matchesSearch(key, dict, searchTerm) {
-            if (!searchTerm) return true;
-            const term = searchTerm.toLowerCase();
-            // поиск по имени ключа
-            if (key.toLowerCase().includes(term)) return true;
-            // поиск по всем полям и значениям словаря
-            for (const [field, value] of Object.entries(dict)) {
-                if (field.toLowerCase().includes(term)) return true;
-                if (String(value).toLowerCase().includes(term)) return true;
-            }
-            return false;
+        // Функция извлечения timestamp из ключа формата "name:timestamp"
+        // Возвращает число (миллисекунды) для сортировки, или null если не удалось распарсить
+        function extractTimestampFromKey(key) {
+            const colonIndex = key.indexOf(':');
+            if (colonIndex === -1) return null;
+            let timestampStr = key.substring(colonIndex + 1).trim();
+            // Заменяем пробел на 'T' для совместимости с Date.parse
+            timestampStr = timestampStr.replace(' ', 'T');
+            const date = new Date(timestampStr);
+            return isNaN(date.getTime()) ? null : date.getTime();
         }
 
-        // фильтрация данных на основе currentFilterText
-        function getFilteredData() {
-            if (!currentFilterText.trim()) {
-                return originalData;
-            }
-            const filtered = {};
+        // Сортировка ключей по timestamp убывание (новые сверху)
+        function sortKeysByTimestampDesc(keys) {
+            const withTimestamp = keys.map(key => {
+                let ts = extractTimestampFromKey(key);
+                if (ts === null || isNaN(ts)) ts = -Infinity; // ключи без корректного времени уходят в конец
+                return { key, ts };
+            });
+            withTimestamp.sort((a, b) => {
+                if (a.ts === b.ts) return a.key.localeCompare(b.key);
+                return b.ts - a.ts; // по убыванию (сначала новые)
+            });
+            return withTimestamp.map(item => item.key);
+        }
+
+        // Получение отфильтрованных и отсортированных блоков
+        function getFilteredAndSortedBlocks() {
+            const term = currentFilter.trim().toLowerCase();
+            const resultBlocks = [];
+
             for (const [key, dict] of Object.entries(originalData)) {
-                if (matchesSearch(key, dict, currentFilterText.trim())) {
-                    filtered[key] = dict;
+                // Сортируем поля внутри каждого ключа по имени (возрастание)
+                const sortedEntries = Object.entries(dict).sort((a, b) => a[0].localeCompare(b[0]));
+                const filteredEntries = term ? sortedEntries.filter(([field, value]) =>
+                    key.toLowerCase().includes(term) ||
+                    field.toLowerCase().includes(term) ||
+                    String(value).toLowerCase().includes(term)
+                ) : sortedEntries;
+
+                if (filteredEntries.length > 0) {
+                    const filteredDict = Object.fromEntries(filteredEntries);
+                    resultBlocks.push({ key, dict: filteredDict });
+                } else if (key.toLowerCase().includes(term)) {
+                    // ключ подходит, но поля не попали — показываем все поля
+                    resultBlocks.push({ key, dict: Object.fromEntries(sortedEntries) });
                 }
             }
-            return filtered;
+
+            // Сортировка блоков по убыванию timestamp (новые сверху)
+            resultBlocks.sort((a, b) => {
+                const tsA = extractTimestampFromKey(a.key);
+                const tsB = extractTimestampFromKey(b.key);
+                if (tsA === null && tsB === null) return a.key.localeCompare(b.key);
+                if (tsA === null) return 1;
+                if (tsB === null) return -1;
+                if (tsA === tsB) return a.key.localeCompare(b.key);
+                return tsB - tsA;
+            });
+
+            return resultBlocks;
         }
 
-        // отрисовка карточек (безопасная, с экранированием)
-        function render(dataToRender) {
-            const entries = Object.entries(dataToRender);
-            const totalOriginal = Object.keys(originalData).length;
-            const displayedCount = entries.length;
+        // отрисовка блоков
+        function render() {
+            const blocks = getFilteredAndSortedBlocks();
+            const totalKeyCount = Object.keys(originalData).length;
+            totalKeysSpan.innerText = totalKeyCount;
 
-            totalKeysSpan.innerText = totalOriginal;
-            displayedKeysSpan.innerText = displayedCount;
-
-            if (!entries.length) {
-                container.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:3rem; background:white; border-radius:2rem; color:#6c7f8f;">
-                                        <i class="fas fa-inbox" style="font-size:2rem; opacity:0.5;"></i>
-                                        <p style="margin-top:0.7rem;">Нет данных, соответствующих фильтру 🤷</p>
-                                        <button id="resetFromEmptyBtn" class="btn btn-outline" style="margin-top:1rem;"><i class="fas fa-undo-alt"></i> Сбросить поиск</button>
+            if (!blocks.length) {
+                container.innerHTML = `<div class="empty-message">
+                                        <i class="fas fa-filter" style="font-size: 2rem; opacity: 0.6;"></i>
+                                        <p style="margin-top: 0.8rem;">Нет данных, соответствующих фильтру</p>
+                                        <button id="resetFilterBtn" class="btn btn-outline" style="margin-top: 1rem;">Сбросить поиск</button>
                                     </div>`;
-                const resetEmptyBtn = document.getElementById('resetFromEmptyBtn');
-                if (resetEmptyBtn) resetEmptyBtn.addEventListener('click', () => {
+                const resetBtn = document.getElementById('resetFilterBtn');
+                if (resetBtn) resetBtn.addEventListener('click', () => {
                     searchInput.value = '';
-                    currentFilterText = '';
-                    applyFilterAndRender();
+                    currentFilter = '';
+                    render();
                 });
                 return;
             }
 
-            let cardsHtml = '';
-            for (const [key, dict] of entries) {
-                const dictEntries = Object.entries(dict);
-                const dictSize = dictEntries.length;
+            let html = '';
+            for (const block of blocks) {
+                const key = block.key;
+                const dict = block.dict;
+                const entries = Object.entries(dict);
                 const escapedKey = escapeHtml(key);
 
-                // построение строк списка полей
-                let dictBodyHtml = '';
-                if (dictSize === 0) {
-                    dictBodyHtml = `<div class="empty-dict"><i class="far fa-folder-open"></i> Пустой словарь (hash без полей)</div>`;
+                html += `<div class="key-block" data-key="${escapedKey.replace(/"/g, '&quot;')}">
+                        <div class="block-header">
+                            <div class="key-title">
+                                <i class="fas fa-tag"></i> ${escapedKey}
+                            </div>
+                            <button class="copy-key-btn" data-copykey="${escapedKey.replace(/"/g, '&quot;')}" title="Копировать ключ">
+                                <i class="far fa-copy"></i>
+                            </button>
+                        </div>
+                        <div class="fields-list">`;
+
+                if (entries.length === 0) {
+                    html += `<div class="empty-dict-placeholder"><i class="far fa-folder-open"></i> Пустой словарь</div>`;
                 } else {
-                    for (const [field, val] of dictEntries) {
+                    for (const [field, value] of entries) {
                         const escapedField = escapeHtml(field);
-                        const escapedVal = escapeHtml(String(val ?? ''));
-                        dictBodyHtml += `
-                        <div class="dict-item">
-                            <div class="dict-field">${escapedField}</div>
-                            <div class="dict-value">${escapedVal || '<span style="opacity:0.6;">∅</span>'}</div>
+                        const escapedValue = escapeHtml(String(value ?? ''));
+                        html += `
+                        <div class="field-row">
+                            <div class="field-name">${escapedField}</div>
+                            <div class="field-value-wrapper">
+                                <div class="field-value">${escapedValue || '<span style="opacity:0.6;">∅</span>'}</div>
+                                <button class="copy-value-btn" data-value="${escapedValue.replace(/"/g, '&quot;')}" title="Копировать значение">
+                                    <i class="far fa-copy"></i>
+                                </button>
+                            </div>
                         </div>
                     `;
                     }
                 }
-
-                cardsHtml += `
-                <div class="redis-card" data-key-id="${escapedKey.replace(/"/g, '&quot;')}">
-                    <div class="card-header">
-                        <span class="key-name">
-                            <i class="fas fa-tag" style="font-size:0.8rem;"></i> ${escapedKey}
-                            <span class="badge-length">${dictSize} поле${getNoun(dictSize)}</span>
-                        </span>
-                        <button class="copy-key" data-copykey="${escapedKey.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}" title="Копировать ключ">
-                            <i class="far fa-copy"></i>
-                        </button>
-                    </div>
-                    <div class="dict-body">
-                        ${dictBodyHtml}
-                    </div>
-                </div>
-            `;
+                html += `</div></div>`;
             }
-            container.innerHTML = cardsHtml;
+            container.innerHTML = html;
 
-            // добавить обработчики копирования для каждой карточки
-            document.querySelectorAll('.copy-key').forEach(btn => {
+            // Копирование ключа
+            document.querySelectorAll('.copy-key-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    // оригинальный ключ хранится в data-copykey (но нам нужен чистый ключ, берем из атрибута)
-                    let rawKey = btn.getAttribute('data-copykey');
-                    if (!rawKey) {
-                        // fallback: из соседнего элемента
-                        const parent = btn.closest('.redis-card');
-                        const keySpan = parent?.querySelector('.key-name');
-                        if (keySpan) rawKey = keySpan.innerText.split('поле')[0].trim();
-                    }
-                    if (rawKey) {
-                        navigator.clipboard.writeText(rawKey).then(() => {
-                            showTemporaryToast(btn, '✅ Ключ скопирован');
+                    const key = btn.getAttribute('data-copykey');
+                    if (key) {
+                        navigator.clipboard.writeText(key).then(() => {
+                            const original = btn.innerHTML;
+                            btn.innerHTML = '<i class="fas fa-check"></i>';
+                            setTimeout(() => { btn.innerHTML = original; }, 800);
                         }).catch(() => alert('Не удалось скопировать'));
-                    } else {
-                        alert('Не удалось определить ключ');
+                    }
+                });
+            });
+
+            // Копирование значения (подблока)
+            document.querySelectorAll('.copy-value-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const val = btn.getAttribute('data-value');
+                    if (val !== undefined && val !== null) {
+                        navigator.clipboard.writeText(val).then(() => {
+                            const original = btn.innerHTML;
+                            btn.innerHTML = '<i class="fas fa-check"></i>';
+                            setTimeout(() => { btn.innerHTML = original; }, 800);
+                        }).catch(() => alert('Ошибка копирования значения'));
                     }
                 });
             });
         }
 
-        // вспомогательный склонение
-        function getNoun(count) {
-            return (count % 10 === 1 && count % 100 !== 11) ? '' :
-                ((count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 10 || count % 100 >= 20)) ? 'я' : 'й');
+        function applyFilter() {
+            currentFilter = searchInput.value;
+            render();
         }
 
-        // уведомление (мини-тост поверх кнопки)
-        function showTemporaryToast(btn, msg) {
-            const originalText = btn.innerHTML;
-            btn.innerHTML = `<i class="fas fa-check"></i>`;
-            setTimeout(() => {
-                btn.innerHTML = originalText;
-            }, 1200);
-            // дополнительный мелкий индикатор
-        }
-
-        // применить фильтр и обновить отображение
-        function applyFilterAndRender() {
-            const filtered = getFilteredData();
-            render(filtered);
-        }
-
-        // обновить данные и сбросить поиск
-        function setNewData(dataObj, resetSearch = true) {
-            if (!dataObj || typeof dataObj !== 'object') {
-                console.warn('Некорректные данные');
-                return;
-            }
-            // нормализация: убедиться, что все значения являются объектами (словарями)
-            const normalized = {};
-            for (const [k, v] of Object.entries(dataObj)) {
-                if (v && typeof v === 'object' && !Array.isArray(v)) {
-                    normalized[k] = v;
-                } else {
-                    // если значение не словарь, обернём в словарь для наглядности (но по условию ожидаем словарь)
-                    normalized[k] = { '⚠️ значение (не словарь)': JSON.stringify(v) };
-                }
-            }
-            originalData = normalized;
-            if (resetSearch) {
-                searchInput.value = '';
-                currentFilterText = '';
-            } else {
-                currentFilterText = searchInput.value;
-            }
-            applyFilterAndRender();
-        }
-
-        // --- ДЕМО-ДАННЫЕ (пример: строка -> словарь) ---
-        function loadDemoData() {
-            const demo = {
-                "user:1001": {
-                    "name": "Алиса Винтер",
-                    "email": "alice@redis.demo",
-                    "role": "admin",
-                    "last_login": "2025-02-18T10:32:00Z",
-                    "preferences": "dark_mode, notifications_on"
-                },
-                "user:1002": {
-                    "name": "Борис Соколов",
-                    "email": "boris@example.com",
-                    "role": "editor",
-                    "last_login": "2025-02-17T22:15:00Z",
-                    "country": "Россия"
-                },
-                "product:catalog:42": {
-                    "title": "Механическая клавиатура",
-                    "price_usd": "119.99",
-                    "stock": "47",
-                    "tags": "mechanical, rgb, wireless"
-                },
-                "session:9a7b3f": {
-                    "user_id": "1001",
-                    "created_at": "2025-02-18T08:00:00Z",
-                    "expires": "3600",
-                    "ip": "192.168.1.104"
-                },
-                "config:feature_flags": {
-                    "new_dashboard": "true",
-                    "beta_api": "false",
-                    "analytics_enabled": "true",
-                    "cache_ttl_seconds": "300"
-                },
-                "metrics:api:latency": {
-                    "p95_ms": "124",
-                    "p99_ms": "278",
-                    "requests_per_second": "340"
-                }
-            };
-            setNewData(demo, true);
-            showStatusMessage("🍃 Демонстрационные данные загружены (эмуляция Redis hash)");
-        }
-
-        // вывести легкое сообщение (временно в углу)
-        let toastTimeout;
-        function showStatusMessage(msg, isError = false) {
-            const existing = document.querySelector('.floating-toast');
-            if (existing) existing.remove();
-            const toast = document.createElement('div');
-            toast.className = 'floating-toast';
-            toast.style.cssText = `position:fixed; bottom:1.5rem; right:1.5rem; background:${isError ? '#c2410c' : '#1f2937'}; color:white; padding:0.6rem 1.2rem; border-radius:2rem; font-size:0.85rem; z-index:1000; box-shadow:0 8px 20px rgba(0,0,0,0.2); backdrop-filter:blur(4px); font-weight:500; display:flex; align-items:center; gap:8px;`;
-            toast.innerHTML = `<i class="fas ${isError ? 'fa-exclamation-triangle' : 'fa-check-circle'}"></i> ${msg}`;
-            document.body.appendChild(toast);
-            if (toastTimeout) clearTimeout(toastTimeout);
-            toastTimeout = setTimeout(() => toast?.remove(), 2800);
-        }
-
-        // --- ЗАГРУЗКА ИЗ РЕАЛЬНОГО API (ожидаем JSON { key: {subfield: val} })---
+        // загрузка из API
         async function fetchFromApi() {
-            container.innerHTML = `<div class="loading-spinner"><i class="fas fa-spinner fa-pulse"></i> Запрос к /get_queries_history ...</div>`;
+            container.innerHTML = `<div class="loading"><i class="fas fa-spinner fa-pulse"></i> Запрос к /get_queries_history ...</div>`;
             try {
-                const response = await fetch('/get_queries_history', {
-                    method: 'GET',
-                    headers: { 'Accept': 'application/json' }
-                });
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status} – ${response.statusText}`);
-                }
-                const result = await response.json();
-                // поддержка двух форматов: прямой объект ключ->словарь или обёртка { data: {...} }
-                let payload = result;
-                if (result && typeof result === 'object' && result.data && typeof result.data === 'object') {
-                    payload = result.data;
-                }
-                if (!payload || typeof payload !== 'object') {
-                    throw new Error('Неверный формат: ожидается объект ключ:словарь');
-                }
-                setNewData(payload, true);
-                showStatusMessage(`✅ Данные из API загружены (${Object.keys(payload).length} ключей)`);
+                const resp = await fetch('/get_queries_history');
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                let payload = data;
+                if (data && typeof data === 'object' && data.data) payload = data.data;
+                if (!payload || typeof payload !== 'object') throw new Error('Неверный формат');
+                originalData = payload;
+                searchInput.value = '';
+                currentFilter = '';
+                render();
+                showToast(`✅ Загружено ${Object.keys(originalData).length} запросов`, false);
             } catch (err) {
                 console.error(err);
-                container.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:2rem; background:#fff5f0; border-radius:2rem; color:#b91c1c;">
-                                        <i class="fas fa-plug-warning" style="font-size:2rem;"></i>
-                                        <p style="margin-top:0.8rem;">Не удалось загрузить данные с <code>/get_queries_history</code></p>
-                                        <p style="font-size:0.85rem;">${escapeHtml(err.message)}</p>
-                                        <button id="retryApiBtn" class="btn btn-primary" style="margin-top:1rem;"><i class="fas fa-sync-alt"></i> Повторить</button>
-                                        <button id="fallbackDemoBtn" class="btn btn-outline">Показать демо</button>
+                container.innerHTML = `<div class="empty-message">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        <p>Ошибка подключения к API. Запустите бэкенд.</p>
+                                        <button id="retryBtn" class="btn btn-primary">Повторить</button>
                                     </div>`;
-                const retryBtn = document.getElementById('retryApiBtn');
-                const fallbackDemo = document.getElementById('fallbackDemoBtn');
-                if (retryBtn) retryBtn.addEventListener('click', () => fetchFromApi());
-                if (fallbackDemo) fallbackDemo.addEventListener('click', () => loadDemoData());
-                showStatusMessage('Ошибка соединения с API Redis', true);
+                const retry = document.getElementById('retryBtn');
+                if (retry) retry.addEventListener('click', () => fetchFromApi());
+                showToast('Не удалось загрузить данные', true);
             }
         }
 
-        // Обработчики и инициализация
-        function initEventListeners() {
-            searchInput.addEventListener('input', (e) => {
-                currentFilterText = e.target.value;
-                applyFilterAndRender();
-            });
+        function showToast(msg, isError) {
+            const t = document.createElement('div');
+            t.style.cssText = `position:fixed; bottom:20px; right:20px; background:${isError ? '#b91c1c' : '#1e293b'}; color:white; padding:8px 16px; border-radius:40px; font-size:0.8rem; z-index:999; box-shadow:0 4px 12px black; border-left: 4px solid #f97316;`;
+            t.innerHTML = `<i class="fas ${isError ? 'fa-times-circle' : 'fa-check-circle'}"></i> ${msg}`;
+            document.body.appendChild(t);
+            setTimeout(() => t.remove(), 2800);
+        }
 
+        function init() {
+            refreshBtn.addEventListener('click', () => fetchFromApi());
             clearSearchBtn.addEventListener('click', () => {
                 searchInput.value = '';
-                currentFilterText = '';
-                applyFilterAndRender();
-                showStatusMessage('Поиск сброшен', false);
+                currentFilter = '';
+                render();
+                showToast('Поиск сброшен', false);
             });
-
-            fetchApiBtn.addEventListener('click', () => {
-                fetchFromApi();
-            });
-
-            demoBtn.addEventListener('click', () => {
-                loadDemoData();
-            });
+            searchInput.addEventListener('input', applyFilter);
+            fetchFromApi();
         }
 
-        // первоначальный запуск: показываем демо сразу (красиво)
-        function bootstrap() {
-            initEventListeners();
-            // загружаем демо-данные для мгновенного отображения
-            loadDemoData();
-            // опционально: можно проверить, есть ли API, но не мешаем пользователю
-            setTimeout(() => {
-                // просто тихо, никаких принудительных фетчей, но можно сделать доп. подсказку
-                if (Object.keys(originalData).length > 0) return;
-            }, 100);
-        }
-
-        bootstrap();
+        init();
     </script>
 </body>
 
