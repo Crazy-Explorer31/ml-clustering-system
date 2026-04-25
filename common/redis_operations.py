@@ -80,3 +80,16 @@ def delete_job_state(jobs_pool, job_id: str):
 def update_job_status(jobs_pool, job_id: str, new_status: str):
     """Обновить только поле status."""
     jobs_pool.hset(f"job:{job_id}", "status", new_status)
+
+
+def save_query(redis_conn: Redis, user_name: str, timestamp: str, query_info: dict):
+    for key, value in query_info.items():
+        if isinstance(value, dict):
+            query_info[key] = json.dumps(value, indent=2, ensure_ascii=False)
+        elif not isinstance(value, str):
+            raise RuntimeError(f"save_query: dunno how to dump value: {value}")
+
+    redis_conn.hset(
+        f"{user_name}:{timestamp}",
+        mapping=query_info,
+    )

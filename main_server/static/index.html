@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Кластеризация медицинских документов · Авторизация</title>
+    <title>Кластеризация медицинских документов · Автостатус</title>
     <style>
         * {
             box-sizing: border-box;
@@ -361,6 +361,27 @@
         .json-header button:hover {
             background: #475569;
         }
+
+        .poll-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-left: 1rem;
+            font-size: 0.85rem;
+        }
+
+        .poll-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            background: #475569;
+        }
+
+        .poll-active .poll-dot {
+            background: #22c55e;
+            box-shadow: 0 0 6px #22c55e;
+        }
     </style>
 </head>
 
@@ -439,7 +460,7 @@
             <div id="job-created-info" style="margin-top: 1rem;"></div>
         </div>
 
-        <!-- Проверка статуса и результата -->
+        <!-- Блок проверки статуса и результата -->
         <div class="card">
             <div class="card-header">
                 <h2>🔍 Информация о задаче</h2>
@@ -450,14 +471,20 @@
                     <label>🆔 ID задачи</label>
                     <input type="text" id="job-id-input" placeholder="например: abcde_123" class="job-id-input">
                 </div>
-                <div style="display: flex; gap: 0.8rem;">
+                <div style="display: flex; gap: 0.8rem; align-items: center;">
                     <button id="check-info-btn" class="btn-outline">📋 Статус</button>
                     <button id="get-result-btn" class="btn-outline">📥 Получить результат</button>
+                    <button id="toggle-poll-btn" class="btn-outline" title="Автообновление статуса">🔄
+                        Отслеживать</button>
+                    <span id="poll-indicator" class="poll-indicator">
+                        <span class="poll-dot"></span> <span id="poll-status-text">остановлено</span>
+                    </span>
                 </div>
             </div>
 
             <div id="job-info-display" class="info-box">
-                <p style="color: #94a3b8; margin:0;">Введите ID задачи и нажмите «Статус»</p>
+                <p style="color: #94a3b8; margin:0;">Введите ID задачи и нажмите «Статус» или включите автообновление
+                </p>
             </div>
             <div id="result-display"></div>
             <div id="error-display"></div>
@@ -465,7 +492,7 @@
 
         <hr>
         <div class="footer-note">
-            ⚡ UI для сервиса кластеризации • OpenAPI 3.1 • Тёмная тема • JWT авторизация
+            ⚡ UI для сервиса кластеризации • OpenAPI 3.1 • Тёмная тема • JWT • Автостатус
         </div>
     </div>
 
@@ -475,7 +502,6 @@
             const rootDesc = document.getElementById('root-description');
             const usernameInput = document.getElementById('username-input');
             const passwordInput = document.getElementById('password-input');
-            // const registerBtn = document.getElementById('register-btn');0
             const loginBtn = document.getElementById('login-btn');
             const logoutBtn = document.getElementById('logout-btn');
             const authStatus = document.getElementById('auth-status');
@@ -493,13 +519,19 @@
             const jobIdInput = document.getElementById('job-id-input');
             const checkInfoBtn = document.getElementById('check-info-btn');
             const getResultBtn = document.getElementById('get-result-btn');
+            const togglePollBtn = document.getElementById('toggle-poll-btn');
+            const pollIndicator = document.getElementById('poll-indicator');
+            const pollStatusText = document.getElementById('poll-status-text');
             const jobInfoDisplay = document.getElementById('job-info-display');
             const resultDisplay = document.getElementById('result-display');
             const errorDisplay = document.getElementById('error-display');
 
-            // ---------- Состояние авторизации ----------
+            // ---------- Состояние ----------
             let accessToken = localStorage.getItem('access_token') || null;
+            let pollingIntervalId = null;
+            let currentPollingJobId = null;
 
+            // ---------- Авторизация ----------
             function updateAuthUI() {
                 if (accessToken) {
                     authStatus.innerHTML = '🟢 Авторизован';
@@ -517,12 +549,10 @@
             }
             updateAuthUI();
 
-            // ---------- Вспомогательные функции ----------
             function clearError() { errorDisplay.innerHTML = ''; }
             function showError(text) { errorDisplay.innerHTML = `<div class="error-msg">❌ ${text}</div>`; }
             function showSuccess(text) { errorDisplay.innerHTML = `<div class="success-msg">✅ ${text}</div>`; }
 
-            // Загрузка корневого описания
             async function loadRootInfo() {
                 try {
                     const res = await fetch('/');
@@ -535,27 +565,6 @@
             }
 
             // ---------- Логика авторизации ----------
-            // registerBtn.addEventListener('click', async () => {
-            //     const payload = {
-            //         username: usernameInput.value.trim(),
-            //         password: passwordInput.value,
-            //         email: "user@example.com",
-            //         full_name: "New User",
-            //         disabled: false
-            //     };
-            //     try {
-            //         const res = await fetch('/register', {
-            //             method: 'POST',
-            //             headers: { 'Content-Type': 'application/json' },
-            //             body: JSON.stringify(payload)
-            //         });
-            //         if (res.ok) showSuccess('Регистрация успешна. Теперь войдите.');
-            //         else {
-            //             const data = await res.json();
-            //             showError(data.detail || 'Ошибка регистрации');
-            //         }
-            //     } catch (e) { showError(e.message); }
-            // });
             loginBtn.addEventListener('click', async () => {
                 const username = usernameInput.value.trim();
                 const password = passwordInput.value;
@@ -565,11 +574,9 @@
                 }
                 clearError();
                 authStatus.innerHTML = '⏳ Вход...';
-
                 const formData = new URLSearchParams();
                 formData.append('username', username);
                 formData.append('password', password);
-
                 try {
                     const response = await fetch('/token', {
                         method: 'POST',
@@ -577,9 +584,7 @@
                         body: formData
                     });
                     const data = await response.json();
-                    if (!response.ok) {
-                        throw new Error(data.detail || 'Ошибка авторизации');
-                    }
+                    if (!response.ok) throw new Error(data.detail || 'Ошибка авторизации');
                     accessToken = data.access_token;
                     localStorage.setItem('access_token', accessToken);
                     updateAuthUI();
@@ -595,84 +600,137 @@
                 accessToken = null;
                 localStorage.removeItem('access_token');
                 updateAuthUI();
+                stopPolling();
                 showSuccess('Вы вышли из системы');
                 jobInfoDisplay.innerHTML = `<p style="color:#94a3b8;">Введите ID задачи и нажмите «Статус»</p>`;
                 resultDisplay.innerHTML = '';
             });
 
-            // Функция для выполнения авторизованных запросов
             async function authFetch(url, options = {}) {
-                if (!accessToken) {
-                    throw new Error('Необходима авторизация. Войдите в систему.');
-                }
-                const headers = {
-                    ...options.headers,
-                    'Authorization': `Bearer ${accessToken}`
-                };
+                if (!accessToken) throw new Error('Необходима авторизация. Войдите в систему.');
+                const headers = { ...options.headers, 'Authorization': `Bearer ${accessToken}` };
                 const response = await fetch(url, { ...options, headers });
                 if (response.status === 401) {
-                    // Токен истёк или недействителен
                     accessToken = null;
                     localStorage.removeItem('access_token');
                     updateAuthUI();
+                    stopPolling();
                     throw new Error('Сессия истекла. Пожалуйста, войдите снова.');
                 }
                 return response;
             }
 
-            // ---------- Примеры JSON для гиперпараметров ----------
+            // ---------- Опрос статуса ----------
+            async function updateJobInfo(jobId) {
+                if (!jobId) return;
+                try {
+                    const response = await authFetch(`/job_info/${encodeURIComponent(jobId)}`);
+                    const info = await response.json();
+                    if (!response.ok) throw new Error(info.detail || `Ошибка ${response.status}`);
+
+                    const status = info.status || 'unknown';
+                    const statusClass =
+                        status === 'waiting' ? 'status-waiting' :
+                            status === 'running' ? 'status-running' :
+                                status === 'done' ? 'status-done' :
+                                    status === 'failed' ? 'status-failed' : '';
+                    const statusText =
+                        status === 'waiting' ? 'ОЖИДАНИЕ' :
+                            status === 'running' ? 'ВЫПОЛНЯЕТСЯ' :
+                                status === 'done' ? 'ГОТОВО' :
+                                    status === 'failed' ? 'ОШИБКА' : status.toUpperCase();
+
+                    let html = `<div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                        <span class="status-chip ${statusClass}">📌 ${statusText}</span>
+                        <span><strong>Датасет:</strong> ${info.dataset_id || '—'}</span>
+                        <span><strong>Алгоритм:</strong> ${info.clustering_algo || '—'}</span>
+                        <span><strong>Эмбеддинги:</strong> ${info.embeddings_method || '—'}</span>
+                    </div>`;
+                    if (info.clustering_hyperparams || info.embeddings_hyperparams) {
+                        html += `<div style="margin-top: 1.2rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div><strong>🧪 Параметры кластеризации</strong><pre>${JSON.stringify(info.clustering_hyperparams, null, 2)}</pre></div>
+                        <div><strong>📊 Параметры эмбеддингов</strong><pre>${JSON.stringify(info.embeddings_hyperparams, null, 2)}</pre></div>
+                    </div>`;
+                    }
+                    jobInfoDisplay.innerHTML = html;
+                    // Если статус конечный, останавливаем опрос
+                    if (status === 'done' || status === 'failed') {
+                        stopPolling();
+                        if (status === 'done') {
+                            showSuccess(`Задача ${jobId} завершена!`);
+                        } else {
+                            showError(`Задача ${jobId} завершилась с ошибкой.`);
+                        }
+                    }
+                    return status;
+                } catch (err) {
+                    jobInfoDisplay.innerHTML = `<p style="color:#fca5a5;">Не удалось получить информацию</p>`;
+                    showError(err.message);
+                    stopPolling();
+                    return null;
+                }
+            }
+
+            function startPolling(jobId) {
+                if (!jobId) return;
+                // Остановить предыдущий опрос, если был
+                stopPolling();
+                currentPollingJobId = jobId;
+                pollingIntervalId = setInterval(() => updateJobInfo(jobId), 5000); // каждые 5 сек
+                pollIndicator.classList.add('poll-active');
+                pollStatusText.textContent = 'активно';
+                togglePollBtn.textContent = '⏹ Остановить';
+                // Сразу сделать первый запрос
+                updateJobInfo(jobId);
+            }
+
+            function stopPolling() {
+                if (pollingIntervalId) {
+                    clearInterval(pollingIntervalId);
+                    pollingIntervalId = null;
+                }
+                currentPollingJobId = null;
+                pollIndicator.classList.remove('poll-active');
+                pollStatusText.textContent = 'остановлено';
+                togglePollBtn.textContent = '🔄 Отслеживать';
+            }
+
+            togglePollBtn.addEventListener('click', () => {
+                const jobId = jobIdInput.value.trim();
+                if (pollingIntervalId) {
+                    stopPolling();
+                } else if (jobId) {
+                    startPolling(jobId);
+                } else {
+                    showError('Введите ID задачи для отслеживания');
+                }
+            });
+
+            // При изменении поля ID сбрасываем автоопрос
+            jobIdInput.addEventListener('input', () => {
+                if (pollingIntervalId) {
+                    stopPolling();
+                }
+            });
+
+            // ---------- JSON гиперпараметры ----------
             function getDefaultClusteringJson(algo) {
                 if (algo === 'kmeans') {
-                    return JSON.stringify({
-                        n_clusters: 8,
-                        max_iter: 300,
-                        tol: 0.0001,
-                        algorithm: "lloyd"
-                    }, null, 2);
+                    return JSON.stringify({ n_clusters: 8, max_iter: 300, tol: 0.0001, algorithm: "lloyd" }, null, 2);
                 } else {
-                    return JSON.stringify({
-                        n_clusters: 8,
-                        n_init: 10,
-                        gamma: 1.0,
-                        n_neighbors: 10,
-                        assign_labels: "kmeans",
-                        degree: 3.0,
-                        coef0: 1.0
-                    }, null, 2);
+                    return JSON.stringify({ n_clusters: 8, n_init: 10, gamma: 1.0, n_neighbors: 10, assign_labels: "kmeans", degree: 3.0, coef0: 1.0 }, null, 2);
                 }
             }
-
             function getDefaultEmbeddingsJson(method) {
-                if (method === 'tfidf') {
-                    return JSON.stringify({
-                        max_df: 1.0,
-                        min_df: 1
-                    }, null, 2);
-                } else if (method === 'word2vec') {
-                    return JSON.stringify({
-                        alpha: 0.025
-                    }, null, 2);
-                } else if (method === 'doc2vec') {
-                    return JSON.stringify({
-                        alpha: 0.025
-                    }, null, 2);
-                } else { // fasttext
-                    return JSON.stringify({
-                        lr: 0.05,
-                        dim: 100,
-                        ws: 5,
-                        epoch: 5
-                    }, null, 2);
-                }
+                if (method === 'tfidf') return JSON.stringify({ max_df: 1.0, min_df: 1 }, null, 2);
+                else if (method === 'word2vec') return JSON.stringify({ alpha: 0.025 }, null, 2);
+                else if (method === 'doc2vec') return JSON.stringify({ alpha: 0.025 }, null, 2);
+                else return JSON.stringify({ lr: 0.05, dim: 100, ws: 5, epoch: 5 }, null, 2);
             }
-
             function updateJsonExamples() {
-                const algo = clusteringAlgoSelect.value;
-                const method = embeddingsMethodSelect.value;
-                clusteringJsonTextarea.value = getDefaultClusteringJson(algo);
-                embeddingsJsonTextarea.value = getDefaultEmbeddingsJson(method);
+                clusteringJsonTextarea.value = getDefaultClusteringJson(clusteringAlgoSelect.value);
+                embeddingsJsonTextarea.value = getDefaultEmbeddingsJson(embeddingsMethodSelect.value);
             }
-
             clusteringAlgoSelect.addEventListener('change', () => {
                 clusteringJsonTextarea.value = getDefaultClusteringJson(clusteringAlgoSelect.value);
             });
@@ -685,18 +743,14 @@
             resetEmbeddingsBtn.addEventListener('click', () => {
                 embeddingsJsonTextarea.value = getDefaultEmbeddingsJson(embeddingsMethodSelect.value);
             });
-
-            // Инициализация примеров
             updateJsonExamples();
 
-            // ---------- Отправка формы кластеризации ----------
+            // ---------- Отправка задачи ----------
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 clearError();
                 jobCreatedInfo.innerHTML = '';
                 formStatus.textContent = '⏳ Отправка...';
-
-                // Парсинг JSON
                 let clusteringParams, embeddingsParams;
                 try {
                     clusteringParams = JSON.parse(clusteringJsonTextarea.value.trim() || '{}');
@@ -712,7 +766,6 @@
                     formStatus.textContent = '';
                     return;
                 }
-
                 const payload = {
                     dataset_id: datasetSelect.value,
                     clustering_algo: clusteringAlgoSelect.value,
@@ -720,29 +773,24 @@
                     clustering_hyperparams: clusteringParams,
                     embeddings_hyperparams: embeddingsParams
                 };
-
                 try {
                     const response = await authFetch('/perform_clustering', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
-
                     const data = await response.json().catch(() => ({}));
-                    if (!response.ok) {
-                        const detail = data.detail || `Ошибка ${response.status}`;
-                        throw new Error(detail);
-                    }
-
+                    if (!response.ok) throw new Error(data.detail || `Ошибка ${response.status}`);
                     const jobId = data.job_id;
                     if (jobId) {
-                        jobCreatedInfo.innerHTML = `<div class="success-msg">✅ Задача принята! ID задачи: <strong>${jobId}</strong></div>`;
+                        jobCreatedInfo.innerHTML = `<div class="success-msg">✅ Задача принята! ID: <strong>${jobId}</strong></div>`;
                         jobIdInput.value = jobId;
                         formStatus.textContent = 'Готово';
-                        jobInfoDisplay.innerHTML = `<p style="color:#94a3b8;">Используйте ID задачи для проверки статуса</p>`;
                         resultDisplay.innerHTML = '';
+                        // Автоматически запустить отслеживание
+                        startPolling(jobId);
                     } else {
-                        jobCreatedInfo.innerHTML = `<div class="success-msg">✅ Задача принята, но ID задачи не получен</div>`;
+                        jobCreatedInfo.innerHTML = `<div class="success-msg">✅ Задача принята, но ID не получен</div>`;
                     }
                 } catch (err) {
                     showError(err.message);
@@ -752,84 +800,41 @@
                 }
             });
 
-            // ---------- Информация о задаче ----------
-            async function handleCheckInfo() {
+            // ---------- Ручная проверка статуса ----------
+            checkInfoBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
                 const jobId = jobIdInput.value.trim();
                 if (!jobId) { showError('Введите ID задачи'); return; }
                 clearError();
-                jobInfoDisplay.innerHTML = '<p>⏳ Загрузка...</p>';
                 resultDisplay.innerHTML = '';
+                // Не останавливаем автоопрос, просто делаем разовый запрос
+                await updateJobInfo(jobId);
+            });
 
-                try {
-                    const response = await authFetch(`/job_info/${encodeURIComponent(jobId)}`);
-                    const info = await response.json();
-                    if (!response.ok) throw new Error(info.detail || `Ошибка ${response.status}`);
-
-                    const status = info.status || 'unknown';
-                    const statusClass =
-                        status === 'waiting' ? 'status-waiting' :
-                            status === 'running' ? 'status-running' :
-                                status === 'done' ? 'status-done' :
-                                    status === 'failed' ? 'status-failed' : '';
-
-                    const statusText =
-                        status === 'waiting' ? 'ОЖИДАНИЕ' :
-                            status === 'running' ? 'ВЫПОЛНЯЕТСЯ' :
-                                status === 'done' ? 'ГОТОВО' :
-                                    status === 'failed' ? 'ОШИБКА' : status.toUpperCase();
-
-                    let html = `
-                    <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
-                        <span class="status-chip ${statusClass}">📌 ${statusText}</span>
-                        <span><strong>Датасет:</strong> ${info.dataset_id || '—'}</span>
-                        <span><strong>Алгоритм:</strong> ${info.clustering_algo || '—'}</span>
-                        <span><strong>Эмбеддинги:</strong> ${info.embeddings_method || '—'}</span>
-                    </div>
-                `;
-
-                    if (info.clustering_hyperparams || info.embeddings_hyperparams) {
-                        html += `<div style="margin-top: 1.2rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                        <div><strong>🧪 Параметры кластеризации</strong><pre>${JSON.stringify(info.clustering_hyperparams, null, 2)}</pre></div>
-                        <div><strong>📊 Параметры эмбеддингов</strong><pre>${JSON.stringify(info.embeddings_hyperparams, null, 2)}</pre></div>
-                    </div>`;
-                    }
-
-                    jobInfoDisplay.innerHTML = html;
-                    showSuccess(`Статус задачи ${jobId}: ${statusText}`);
-                } catch (err) {
-                    jobInfoDisplay.innerHTML = `<p style="color:#fca5a5;">Не удалось получить информацию</p>`;
-                    showError(err.message);
-                }
-            }
-
-            async function handleGetResult() {
+            // ---------- Получение результата ----------
+            getResultBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
                 const jobId = jobIdInput.value.trim();
                 if (!jobId) { showError('Введите ID задачи'); return; }
                 clearError();
                 resultDisplay.innerHTML = '<p>⏳ Проверка готовности результата...</p>';
-
                 try {
                     const infoRes = await authFetch(`/job_info/${encodeURIComponent(jobId)}`);
                     const info = await infoRes.json();
                     if (!infoRes.ok) throw new Error(info.detail || `Ошибка ${infoRes.status}`);
-
                     if (info.status !== 'done') {
                         resultDisplay.innerHTML = '';
-                        throw new Error(`Результат ещё не готов. Текущий статус: ${info.status || 'неизвестен'}`);
+                        throw new Error(`Результат ещё не готов. Статус: ${info.status || 'неизвестен'}`);
                     }
-
                     const res = await authFetch(`/job_result/${encodeURIComponent(jobId)}`);
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.detail || `Ошибка ${res.status}`);
-
                     const downloadUrl = data.download_url;
                     if (downloadUrl) {
-                        resultDisplay.innerHTML = `
-                        <div class="success-msg" style="display: flex; align-items: center; justify-content: space-between;">
+                        resultDisplay.innerHTML = `<div class="success-msg" style="display: flex; align-items: center; justify-content: space-between;">
                             <span>✅ Результат готов!</span>
                             <a href="${downloadUrl}" target="_blank" class="download-link">📥 Скачать CSV</a>
-                        </div>
-                    `;
+                        </div>`;
                     } else {
                         throw new Error('Ссылка на скачивание не получена');
                     }
@@ -837,17 +842,10 @@
                     resultDisplay.innerHTML = '';
                     showError(err.message);
                 }
-            }
-
-            checkInfoBtn.addEventListener('click', (e) => { e.preventDefault(); handleCheckInfo(); });
-            getResultBtn.addEventListener('click', (e) => { e.preventDefault(); handleGetResult(); });
+            });
 
             // Инициализация
             loadRootInfo();
-            // Если токен уже есть, можно сразу показать статус авторизации
-            if (accessToken) {
-                // Опционально: проверить валидность токена запросом к защищённому эндпоинту
-            }
         })();
     </script>
 </body>

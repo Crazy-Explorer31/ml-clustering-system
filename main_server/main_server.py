@@ -6,8 +6,10 @@ from typing import Annotated
 from fastapi.staticfiles import StaticFiles
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.responses import HTMLResponse
 
 from redis import Redis
+from redis.exceptions import RedisError
 import requests
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException
@@ -16,7 +18,7 @@ from fastapi.responses import FileResponse
 from fastapi import FastAPI, status
 from fastapi.responses import JSONResponse
 
-from common.redis_operations import REDIS_HOST, REDIS_PORT
+from common.redis_operations import *
 from common.s3_operations import *
 from common.query_schemas import *
 from auth_utils import *
@@ -50,6 +52,16 @@ async def register(user: UserCreate, request: Request):
     ok = create_user(app.state.authorised_users, user)
     if not ok:
         raise HTTPException(status_code=400, detail="Пользователь уже существует")
+
+    save_query(
+        app.state.queries_history,
+        user.username,
+        str(datetime.now(timezone.utc)),
+        {
+            "query_type": "/register",
+            "query_body": user.model_dump(),
+        },
+    )
     return {"message": "Пользователь создан"}
 
 
@@ -70,6 +82,18 @@ async def login_for_access_token(
     access_token = create_access_token(
         data={"sub": user.username},
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+
+    save_query(
+        app.state.queries_history,
+        user.username,
+        str(datetime.now(timezone.utc)),
+        {
+            "query_type": "/token",
+            "query_body": {
+                "user_password": form_data.password,
+            },
+        },
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -115,6 +139,15 @@ async def perform_clustering(
     if status_code != 202:
         raise HTTPException(status_code=status_code, detail=content_dict.get("detail"))
 
+    save_query(
+        app.state.queries_history,
+        current_user.username,
+        str(datetime.now(timezone.utc)),
+        {
+            "query_type": "/perform_clustering",
+            "query_body": clustering_request.model_dump(),
+        },
+    )
     return JobAcceptedResponse.model_validate(content_dict)
 
 
@@ -144,6 +177,15 @@ async def job_info(
     if status_code != 200:
         raise HTTPException(status_code=status_code, detail=content_dict.get("detail"))
 
+    save_query(
+        app.state.queries_history,
+        current_user.username,
+        str(datetime.now(timezone.utc)),
+        {
+            "query_type": f"/job_info{job_id}",
+            "query_body": {},
+        },
+    )
     return JobInfoResponse.model_validate(content_dict)
 
 
@@ -188,9 +230,83 @@ async def job_result(
             },
             ExpiresIn=600,  # 10 минут
         )
+        save_query(
+            app.state.queries_history,
+            current_user.username,
+            str(datetime.now(timezone.utc)),
+            {
+                "query_type": f"/job_result{job_id}",
+                "query_body": {},
+            },
+        )
         return ClusteringResultResponse(download_url=url)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 app.mount("/ui", StaticFiles(directory="static", html=True), name="static")
+
+
+@app.get("/authorised_users_ui", response_class=HTMLResponse)
+async def serve_index():
+    with open("authorised_users_ui/index.html", "r", encoding="utf-8") as f:
+        html_content = f.read()
+    return html_content
+
+
+@app.get("/queries_history_ui", response_class=HTMLResponse)
+async def serve_index():
+    with open("queries_history_ui/index.html", "r", encoding="utf-8") as f:
+        html_content = f.read()
+    return html_content
+
+
+@app.get("/get_queries_history")
+async def get_queries_history():
+    """
+    Возвращает все ключи-хеши из Redis и их поля/значения.
+    Игнорируются ключи других типов (строки, списки и т.п.).
+    """
+    result = {}
+    redis_client = app.state.queries_history
+    try:
+        # 1. Получаем все ключи в текущей БД
+        keys = redis_client.keys("*")
+        for key in keys:
+            # 2. Проверяем тип ключа
+            key_type = redis_client.type(key)
+            if key_type == "hash":
+                # 3. Забираем все поля и значения хеша
+                hash_data = redis_client.hgetall(key)
+                result[key] = hash_data
+            elif key_type == "string":
+                result[key] = {"_value": redis_client.get(key)}
+        return result
+    except RedisError as e:
+        return {"error": f"Ошибка Redis: {str(e)}"}
+
+
+@app.get("/get_authorised_users")
+async def get_authorised_users():
+    """
+    Возвращает все ключи-хеши из Redis и их поля/значения.
+    Игнорируются ключи других типов (строки, списки и т.п.).
+    """
+    result = {}
+    redis_client = app.state.authorised_users
+    try:
+        # 1. Получаем все ключи в текущей БД
+        keys = redis_client.keys("*")
+        for key in keys:
+            # 2. Проверяем тип ключа
+            key_type = redis_client.type(key)
+            if key_type == "hash":
+                # 3. Забираем все поля и значения хеша
+                hash_data = redis_client.hgetall(key)
+                result[key] = hash_data
+            elif key_type == "string":
+                result[key] = {"_value": redis_client.get(key)}
+                result[key].pop("hashed_password")
+        return result
+    except RedisError as e:
+        return {"error": f"Ошибка Redis: {str(e)}"}
