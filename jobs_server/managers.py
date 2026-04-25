@@ -159,12 +159,12 @@ class EmbeddingsCacheManager:
 
         try:
             dataset = read_dataframe_from_s3(S3_BUCKET_DATASETS, f"{dataset_id}.csv")
-            print(dataset.head())
+            print(dataset.head(), flush=True)
             vectorizer = vectorizers[embeddings_method]
             dataset_vectorized = vectorizer(dataset, embeddings_hyperparams)
 
             embeddings_key_hash = get_hash(embeddings_key)
-            print(f"write: {embeddings_key_hash}", flush=True)
+            # print(f"write: {embeddings_key_hash}", flush=True)
             sys.stdout.flush()
             write_dataframe_to_redis(
                 dataset_vectorized, embeddings_key_hash, self.embeddings_cache
@@ -175,7 +175,7 @@ class EmbeddingsCacheManager:
 
     def get(self, embeddings_key: str) -> pd.DataFrame:
         embeddings_key_hash = get_hash(embeddings_key)
-        print(f"get: {embeddings_key_hash}", flush=True)
+        # print(f"get: {embeddings_key_hash}", flush=True)
         sys.stdout.flush()
         return read_dataframe_from_redis(embeddings_key_hash, self.embeddings_cache)
 

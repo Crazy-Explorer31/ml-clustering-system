@@ -1,7 +1,12 @@
 fastapi
 joblib
 pandas
+redis
+rq
 uvicorn
 requests
 aioboto3
 debugpy
+bcrypt
+python-jose[cryptography]
+python-multipart

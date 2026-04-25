@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Кластеризация медицинских документов · Тёмная тема</title>
+    <title>Кластеризация медицинских документов · Авторизация</title>
     <style>
         * {
             box-sizing: border-box;
@@ -41,10 +41,49 @@
 
         .subtitle {
             color: #94a3b8;
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
             border-left: 4px solid #38bdf8;
             padding-left: 1rem;
             font-weight: 400;
+        }
+
+        .auth-section {
+            background: #0f172a;
+            border-radius: 16px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            border: 1px solid #334155;
+        }
+
+        .auth-fields {
+            display: flex;
+            gap: 0.8rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .auth-fields input {
+            background: #1e293b;
+            border: 1.5px solid #334155;
+            color: #f1f5f9;
+            padding: 0.5rem 1rem;
+            border-radius: 40px;
+            width: 160px;
+        }
+
+        .auth-status {
+            margin-left: auto;
+            font-weight: 500;
+            color: #94a3b8;
+        }
+
+        .btn-small {
+            padding: 0.5rem 1.2rem;
+            font-size: 0.9rem;
         }
 
         .card {
@@ -122,7 +161,7 @@
 
         textarea {
             font-family: 'SF Mono', 'Menlo', 'Monaco', 'Cascadia Code', monospace;
-            min-height: 90px;
+            min-height: 120px;
             resize: vertical;
         }
 
@@ -293,6 +332,35 @@
             background: #1e293b;
             color: #f1f5f9;
         }
+
+        .param-group {
+            background: #1a2536;
+            border-radius: 16px;
+            padding: 1rem;
+            margin-top: 0.75rem;
+            border: 1px solid #2d3a4e;
+        }
+
+        .json-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .json-header button {
+            background: #334155;
+            border: none;
+            color: #cbd5e1;
+            padding: 0.2rem 0.8rem;
+            border-radius: 30px;
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+
+        .json-header button:hover {
+            background: #475569;
+        }
     </style>
 </head>
 
@@ -300,6 +368,17 @@
     <div class="container">
         <h1>🧬 Кластеризация медицинских документов</h1>
         <div id="root-description" class="subtitle">Загрузка описания сервиса...</div>
+
+        <!-- Блок авторизации -->
+        <div class="auth-section">
+            <div class="auth-fields">
+                <input type="text" id="username-input" placeholder="Логин" value="johndoe">
+                <input type="password" id="password-input" placeholder="Пароль" value="secret">
+                <button id="login-btn" class="btn btn-small">🔐 Войти</button>
+                <button id="logout-btn" class="btn-outline btn-small" style="display:none;">🚪 Выйти</button>
+            </div>
+            <div class="auth-status" id="auth-status">⚪ Не авторизован</div>
+        </div>
 
         <!-- Форма создания задачи -->
         <div class="card">
@@ -310,36 +389,48 @@
             <form id="clustering-form">
                 <div class="form-grid">
                     <div class="full-width">
-                        <label>📁 ID датасета <span style="font-weight: normal;">(обязательно)</span></label>
-                        <input type="text" id="dataset-id" placeholder="например: ds_med_001" required>
+                        <label>📁 Датасет</label>
+                        <select id="dataset-id">
+                            <option value="data" selected>data (основной набор)</option>
+                        </select>
                     </div>
                     <div>
                         <label>🧩 Алгоритм кластеризации</label>
                         <select id="clustering-algo">
-                            <option value="kmeans">k-means</option>
+                            <option value="kmeans" selected>k-means</option>
                             <option value="spectral">spectral</option>
                         </select>
                     </div>
                     <div>
                         <label>🔤 Метод эмбеддингов</label>
                         <select id="embeddings-method">
-                            <option value="tfidf">TF-IDF</option>
+                            <option value="tfidf" selected>TF-IDF</option>
                             <option value="word2vec">Word2Vec</option>
                             <option value="fasttext">FastText</option>
                             <option value="doc2vec">Doc2Vec</option>
                         </select>
                     </div>
-                    <div>
-                        <label>⚙️ Гиперпараметры кластеризации (JSON)</label>
-                        <textarea id="clustering-hyperparams">{"n_clusters": 5, "random_state": 42}</textarea>
-                        <div class="hint">Пример: {"n_clusters": 5, "eps": 0.5}</div>
+                </div>
+
+                <div class="full-width" style="margin-top: 1rem;">
+                    <div class="param-group">
+                        <div class="json-header">
+                            <span style="font-weight:500; color:#a5b4cb;">⚙️ Гиперпараметры кластеризации (JSON)</span>
+                            <button type="button" id="reset-clustering-json">↺ Пример</button>
+                        </div>
+                        <textarea id="clustering-hyperparams-json" rows="4">{"n_clusters": 8}</textarea>
+                        <div class="hint">Введите параметры в формате JSON</div>
                     </div>
-                    <div>
-                        <label>📐 Гиперпараметры эмбеддингов (JSON)</label>
-                        <textarea id="embeddings-hyperparams">{"vector_size": 100, "window": 5}</textarea>
-                        <div class="hint">Пример: {"vector_size": 100, "min_count": 2}</div>
+                    <div class="param-group" style="margin-top: 1rem;">
+                        <div class="json-header">
+                            <span style="font-weight:500; color:#a5b4cb;">📐 Гиперпараметры эмбеддингов (JSON)</span>
+                            <button type="button" id="reset-embeddings-json">↺ Пример</button>
+                        </div>
+                        <textarea id="embeddings-hyperparams-json" rows="4">{}</textarea>
+                        <div class="hint">Введите параметры в формате JSON</div>
                     </div>
                 </div>
+
                 <div class="action-bar">
                     <button type="submit" class="btn">🚀 Отправить задачу</button>
                     <span id="form-status" style="color:#94a3b8;"></span>
@@ -365,7 +456,6 @@
                 </div>
             </div>
 
-            <!-- Область вывода информации -->
             <div id="job-info-display" class="info-box">
                 <p style="color: #94a3b8; margin:0;">Введите ID задачи и нажмите «Статус»</p>
             </div>
@@ -375,7 +465,7 @@
 
         <hr>
         <div class="footer-note">
-            ⚡ UI для сервиса кластеризации • OpenAPI 3.1 • Тёмная тема
+            ⚡ UI для сервиса кластеризации • OpenAPI 3.1 • Тёмная тема • JWT авторизация
         </div>
     </div>
 
@@ -383,12 +473,21 @@
         (function () {
             // ---------- DOM элементы ----------
             const rootDesc = document.getElementById('root-description');
+            const usernameInput = document.getElementById('username-input');
+            const passwordInput = document.getElementById('password-input');
+            // const registerBtn = document.getElementById('register-btn');0
+            const loginBtn = document.getElementById('login-btn');
+            const logoutBtn = document.getElementById('logout-btn');
+            const authStatus = document.getElementById('auth-status');
+
             const form = document.getElementById('clustering-form');
-            const datasetIdInput = document.getElementById('dataset-id');
+            const datasetSelect = document.getElementById('dataset-id');
             const clusteringAlgoSelect = document.getElementById('clustering-algo');
             const embeddingsMethodSelect = document.getElementById('embeddings-method');
-            const clusteringHyperparamsText = document.getElementById('clustering-hyperparams');
-            const embeddingsHyperparamsText = document.getElementById('embeddings-hyperparams');
+            const clusteringJsonTextarea = document.getElementById('clustering-hyperparams-json');
+            const embeddingsJsonTextarea = document.getElementById('embeddings-hyperparams-json');
+            const resetClusteringBtn = document.getElementById('reset-clustering-json');
+            const resetEmbeddingsBtn = document.getElementById('reset-embeddings-json');
             const formStatus = document.getElementById('form-status');
             const jobCreatedInfo = document.getElementById('job-created-info');
             const jobIdInput = document.getElementById('job-id-input');
@@ -398,18 +497,32 @@
             const resultDisplay = document.getElementById('result-display');
             const errorDisplay = document.getElementById('error-display');
 
-            // Вспомогательные функции очистки сообщений
-            function clearError() {
-                errorDisplay.innerHTML = '';
-            }
-            function showError(text) {
-                errorDisplay.innerHTML = `<div class="error-msg">❌ ${text}</div>`;
-            }
-            function showSuccess(text) {
-                errorDisplay.innerHTML = `<div class="success-msg">✅ ${text}</div>`;
-            }
+            // ---------- Состояние авторизации ----------
+            let accessToken = localStorage.getItem('access_token') || null;
 
-            // Загрузка описания с корневого эндпоинта
+            function updateAuthUI() {
+                if (accessToken) {
+                    authStatus.innerHTML = '🟢 Авторизован';
+                    loginBtn.style.display = 'none';
+                    logoutBtn.style.display = 'inline-block';
+                    usernameInput.disabled = true;
+                    passwordInput.disabled = true;
+                } else {
+                    authStatus.innerHTML = '⚪ Не авторизован';
+                    loginBtn.style.display = 'inline-block';
+                    logoutBtn.style.display = 'none';
+                    usernameInput.disabled = false;
+                    passwordInput.disabled = false;
+                }
+            }
+            updateAuthUI();
+
+            // ---------- Вспомогательные функции ----------
+            function clearError() { errorDisplay.innerHTML = ''; }
+            function showError(text) { errorDisplay.innerHTML = `<div class="error-msg">❌ ${text}</div>`; }
+            function showSuccess(text) { errorDisplay.innerHTML = `<div class="success-msg">✅ ${text}</div>`; }
+
+            // Загрузка корневого описания
             async function loadRootInfo() {
                 try {
                     const res = await fetch('/');
@@ -418,36 +531,190 @@
                     rootDesc.textContent = `${data.Name || 'Сервис'} — ${data.Description || ''}`;
                 } catch (e) {
                     rootDesc.textContent = 'Система кластеризации медицинских документов';
-                    console.warn('Не удалось загрузить /', e);
                 }
             }
 
-            // Отправка формы кластеризации
+            // ---------- Логика авторизации ----------
+            // registerBtn.addEventListener('click', async () => {
+            //     const payload = {
+            //         username: usernameInput.value.trim(),
+            //         password: passwordInput.value,
+            //         email: "user@example.com",
+            //         full_name: "New User",
+            //         disabled: false
+            //     };
+            //     try {
+            //         const res = await fetch('/register', {
+            //             method: 'POST',
+            //             headers: { 'Content-Type': 'application/json' },
+            //             body: JSON.stringify(payload)
+            //         });
+            //         if (res.ok) showSuccess('Регистрация успешна. Теперь войдите.');
+            //         else {
+            //             const data = await res.json();
+            //             showError(data.detail || 'Ошибка регистрации');
+            //         }
+            //     } catch (e) { showError(e.message); }
+            // });
+            loginBtn.addEventListener('click', async () => {
+                const username = usernameInput.value.trim();
+                const password = passwordInput.value;
+                if (!username || !password) {
+                    showError('Введите логин и пароль');
+                    return;
+                }
+                clearError();
+                authStatus.innerHTML = '⏳ Вход...';
+
+                const formData = new URLSearchParams();
+                formData.append('username', username);
+                formData.append('password', password);
+
+                try {
+                    const response = await fetch('/token', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: formData
+                    });
+                    const data = await response.json();
+                    if (!response.ok) {
+                        throw new Error(data.detail || 'Ошибка авторизации');
+                    }
+                    accessToken = data.access_token;
+                    localStorage.setItem('access_token', accessToken);
+                    updateAuthUI();
+                    showSuccess('Успешный вход');
+                    authStatus.innerHTML = '🟢 Авторизован';
+                } catch (err) {
+                    showError(err.message);
+                    authStatus.innerHTML = '⚪ Не авторизован';
+                }
+            });
+
+            logoutBtn.addEventListener('click', () => {
+                accessToken = null;
+                localStorage.removeItem('access_token');
+                updateAuthUI();
+                showSuccess('Вы вышли из системы');
+                jobInfoDisplay.innerHTML = `<p style="color:#94a3b8;">Введите ID задачи и нажмите «Статус»</p>`;
+                resultDisplay.innerHTML = '';
+            });
+
+            // Функция для выполнения авторизованных запросов
+            async function authFetch(url, options = {}) {
+                if (!accessToken) {
+                    throw new Error('Необходима авторизация. Войдите в систему.');
+                }
+                const headers = {
+                    ...options.headers,
+                    'Authorization': `Bearer ${accessToken}`
+                };
+                const response = await fetch(url, { ...options, headers });
+                if (response.status === 401) {
+                    // Токен истёк или недействителен
+                    accessToken = null;
+                    localStorage.removeItem('access_token');
+                    updateAuthUI();
+                    throw new Error('Сессия истекла. Пожалуйста, войдите снова.');
+                }
+                return response;
+            }
+
+            // ---------- Примеры JSON для гиперпараметров ----------
+            function getDefaultClusteringJson(algo) {
+                if (algo === 'kmeans') {
+                    return JSON.stringify({
+                        n_clusters: 8,
+                        max_iter: 300,
+                        tol: 0.0001,
+                        algorithm: "lloyd"
+                    }, null, 2);
+                } else {
+                    return JSON.stringify({
+                        n_clusters: 8,
+                        n_init: 10,
+                        gamma: 1.0,
+                        n_neighbors: 10,
+                        assign_labels: "kmeans",
+                        degree: 3.0,
+                        coef0: 1.0
+                    }, null, 2);
+                }
+            }
+
+            function getDefaultEmbeddingsJson(method) {
+                if (method === 'tfidf') {
+                    return JSON.stringify({
+                        max_df: 1.0,
+                        min_df: 1
+                    }, null, 2);
+                } else if (method === 'word2vec') {
+                    return JSON.stringify({
+                        alpha: 0.025
+                    }, null, 2);
+                } else if (method === 'doc2vec') {
+                    return JSON.stringify({
+                        alpha: 0.025
+                    }, null, 2);
+                } else { // fasttext
+                    return JSON.stringify({
+                        lr: 0.05,
+                        dim: 100,
+                        ws: 5,
+                        epoch: 5
+                    }, null, 2);
+                }
+            }
+
+            function updateJsonExamples() {
+                const algo = clusteringAlgoSelect.value;
+                const method = embeddingsMethodSelect.value;
+                clusteringJsonTextarea.value = getDefaultClusteringJson(algo);
+                embeddingsJsonTextarea.value = getDefaultEmbeddingsJson(method);
+            }
+
+            clusteringAlgoSelect.addEventListener('change', () => {
+                clusteringJsonTextarea.value = getDefaultClusteringJson(clusteringAlgoSelect.value);
+            });
+            embeddingsMethodSelect.addEventListener('change', () => {
+                embeddingsJsonTextarea.value = getDefaultEmbeddingsJson(embeddingsMethodSelect.value);
+            });
+            resetClusteringBtn.addEventListener('click', () => {
+                clusteringJsonTextarea.value = getDefaultClusteringJson(clusteringAlgoSelect.value);
+            });
+            resetEmbeddingsBtn.addEventListener('click', () => {
+                embeddingsJsonTextarea.value = getDefaultEmbeddingsJson(embeddingsMethodSelect.value);
+            });
+
+            // Инициализация примеров
+            updateJsonExamples();
+
+            // ---------- Отправка формы кластеризации ----------
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 clearError();
                 jobCreatedInfo.innerHTML = '';
                 formStatus.textContent = '⏳ Отправка...';
 
-                // Валидация JSON
+                // Парсинг JSON
                 let clusteringParams, embeddingsParams;
                 try {
-                    clusteringParams = JSON.parse(clusteringHyperparamsText.value.trim() || '{}');
+                    clusteringParams = JSON.parse(clusteringJsonTextarea.value.trim() || '{}');
                 } catch (err) {
-                    showError('Ошибка в JSON гиперпараметров кластеризации: ' + err.message);
+                    showError('Ошибка в JSON параметров кластеризации: ' + err.message);
                     formStatus.textContent = '';
                     return;
                 }
                 try {
-                    embeddingsParams = JSON.parse(embeddingsHyperparamsText.value.trim() || '{}');
+                    embeddingsParams = JSON.parse(embeddingsJsonTextarea.value.trim() || '{}');
                 } catch (err) {
-                    showError('Ошибка в JSON гиперпараметров эмбеддингов: ' + err.message);
+                    showError('Ошибка в JSON параметров эмбеддингов: ' + err.message);
                     formStatus.textContent = '';
                     return;
                 }
 
                 const payload = {
-                    dataset_id: datasetIdInput.value.trim(),
+                    dataset_id: datasetSelect.value,
                     clustering_algo: clusteringAlgoSelect.value,
                     embeddings_method: embeddingsMethodSelect.value,
                     clustering_hyperparams: clusteringParams,
@@ -455,7 +722,7 @@
                 };
 
                 try {
-                    const response = await fetch('/perform_clustering', {
+                    const response = await authFetch('/perform_clustering', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
@@ -467,13 +734,11 @@
                         throw new Error(detail);
                     }
 
-                    // Успех: 202 Accepted, ожидаем job_id
                     const jobId = data.job_id;
                     if (jobId) {
                         jobCreatedInfo.innerHTML = `<div class="success-msg">✅ Задача принята! ID задачи: <strong>${jobId}</strong></div>`;
-                        jobIdInput.value = jobId;  // автозаполнение поля для удобства
+                        jobIdInput.value = jobId;
                         formStatus.textContent = 'Готово';
-                        // Очищаем старую информацию
                         jobInfoDisplay.innerHTML = `<p style="color:#94a3b8;">Используйте ID задачи для проверки статуса</p>`;
                         resultDisplay.innerHTML = '';
                     } else {
@@ -487,31 +752,19 @@
                 }
             });
 
-            // Функция запроса информации о задаче
-            async function fetchJobInfo(jobId) {
-                if (!jobId) throw new Error('Введите ID задачи');
-                const res = await fetch(`/job_info/${encodeURIComponent(jobId)}`);
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) {
-                    throw new Error(data.detail || `Ошибка ${res.status}`);
-                }
-                return data;
-            }
-
-            // Отображение информации о задаче
+            // ---------- Информация о задаче ----------
             async function handleCheckInfo() {
                 const jobId = jobIdInput.value.trim();
-                if (!jobId) {
-                    showError('Введите ID задачи');
-                    return;
-                }
+                if (!jobId) { showError('Введите ID задачи'); return; }
                 clearError();
                 jobInfoDisplay.innerHTML = '<p>⏳ Загрузка...</p>';
                 resultDisplay.innerHTML = '';
 
                 try {
-                    const info = await fetchJobInfo(jobId);
-                    // Формируем красивый вывод
+                    const response = await authFetch(`/job_info/${encodeURIComponent(jobId)}`);
+                    const info = await response.json();
+                    if (!response.ok) throw new Error(info.detail || `Ошибка ${response.status}`);
+
                     const status = info.status || 'unknown';
                     const statusClass =
                         status === 'waiting' ? 'status-waiting' :
@@ -534,7 +787,6 @@
                     </div>
                 `;
 
-                    // Гиперпараметры
                     if (info.clustering_hyperparams || info.embeddings_hyperparams) {
                         html += `<div style="margin-top: 1.2rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div><strong>🧪 Параметры кластеризации</strong><pre>${JSON.stringify(info.clustering_hyperparams, null, 2)}</pre></div>
@@ -550,30 +802,25 @@
                 }
             }
 
-            // Получение результата (ссылки)
             async function handleGetResult() {
                 const jobId = jobIdInput.value.trim();
-                if (!jobId) {
-                    showError('Введите ID задачи');
-                    return;
-                }
+                if (!jobId) { showError('Введите ID задачи'); return; }
                 clearError();
                 resultDisplay.innerHTML = '<p>⏳ Проверка готовности результата...</p>';
 
                 try {
-                    // Сначала проверяем статус через job_info
-                    const info = await fetchJobInfo(jobId);
+                    const infoRes = await authFetch(`/job_info/${encodeURIComponent(jobId)}`);
+                    const info = await infoRes.json();
+                    if (!infoRes.ok) throw new Error(info.detail || `Ошибка ${infoRes.status}`);
+
                     if (info.status !== 'done') {
                         resultDisplay.innerHTML = '';
                         throw new Error(`Результат ещё не готов. Текущий статус: ${info.status || 'неизвестен'}`);
                     }
 
-                    // Запрашиваем результат
-                    const res = await fetch(`/job_result/${encodeURIComponent(jobId)}`);
-                    const data = await res.json().catch(() => ({}));
-                    if (!res.ok) {
-                        throw new Error(data.detail || `Ошибка ${res.status}`);
-                    }
+                    const res = await authFetch(`/job_result/${encodeURIComponent(jobId)}`);
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.detail || `Ошибка ${res.status}`);
 
                     const downloadUrl = data.download_url;
                     if (downloadUrl) {
@@ -583,10 +830,6 @@
                             <a href="${downloadUrl}" target="_blank" class="download-link">📥 Скачать CSV</a>
                         </div>
                     `;
-                        // Также обновим блок инфо, если там не показан статус done
-                        if (!jobInfoDisplay.innerHTML.includes('status-done')) {
-                            jobInfoDisplay.innerHTML = `<div><span class="status-chip status-done">📌 ГОТОВО</span> (обновлено)</div>` + jobInfoDisplay.innerHTML;
-                        }
                     } else {
                         throw new Error('Ссылка на скачивание не получена');
                     }
@@ -596,19 +839,15 @@
                 }
             }
 
-            // Обработчики кнопок
-            checkInfoBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                handleCheckInfo();
-            });
-            getResultBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                handleGetResult();
-            });
+            checkInfoBtn.addEventListener('click', (e) => { e.preventDefault(); handleCheckInfo(); });
+            getResultBtn.addEventListener('click', (e) => { e.preventDefault(); handleGetResult(); });
 
-            // При загрузке страницы получаем описание
+            // Инициализация
             loadRootInfo();
-
+            // Если токен уже есть, можно сразу показать статус авторизации
+            if (accessToken) {
+                // Опционально: проверить валидность токена запросом к защищённому эндпоинту
+            }
         })();
     </script>
 </body>
