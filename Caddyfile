@@ -1,0 +1,4 @@
+ml-cluster-system.com {
+    reverse_proxy main_server:8000
+    encode gzip
+}
