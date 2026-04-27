@@ -5,7 +5,7 @@ WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-# RUN wget https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.en.300.bin.gz
+# RUN wget https://dl.fbaipublicfiles.com/fasttext-wheel/vectors-crawl/cc.en.300.bin.gz
 # RUN gzip -d cc.en.300.bin.gz
 COPY . .
 

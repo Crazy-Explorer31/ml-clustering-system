@@ -9,7 +9,7 @@ python-multipart
 aiobotocore
 pyarrow
 gensim
-fasttext
+fasttext-wheel
 scikit-learn
 nltk
 debugpy
