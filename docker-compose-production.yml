@@ -1,0 +1,139 @@
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    networks:
+      - app-network
+
+  main_server:
+    build:
+      context: ./main_server
+    # ports удалены – доступ только через caddy
+    depends_on:
+      jobs_server:
+        condition: service_healthy
+    environment:
+      - JOBS_SERVER_URL=http://jobs_server:8001
+      - S3_ENDPOINT_URL=http://minio:9000
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_ENDPOINT_URL_S3=http://minio:9000
+      - AWS_DEFAULT_REGION=us-east-1
+      - S3_BUCKET_RESULTS=results
+    volumes:
+      - ./logs:/app/logs
+      - ./common:/app/common
+    networks:
+      - app-network
+    restart: always
+
+  jobs_server:
+    build:
+      context: ./jobs_server
+    # ports: "8001:8001"  удалён
+    volumes:
+      - ./logs:/app/logs
+      - ./common:/app/common
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - S3_ENDPOINT_URL=http://minio:9000
+      - S3_ACCESS_KEY=${AWS_ACCESS_KEY_ID}
+      - S3_SECRET_KEY=${AWS_SECRET_ACCESS_KEY}
+      - S3_BUCKET_DATASETS=datasets
+      - S3_BUCKET_RESULTS=results
+      - S3_REGION=us-east-1
+    depends_on:
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - app-network
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    # ports: "6379:6379" удалён
+    volumes:
+      - redis-storage:/data
+    command: redis-server --appendonly yes --save 900 1 --save 300 10 --save 60 10000
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - app-network
+    restart: always
+
+  rq-worker:
+    build:
+      context: ./jobs_server
+    command: rq worker --url redis://redis:6379/2
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - S3_ENDPOINT_URL=http://minio:9000
+      - S3_ACCESS_KEY=${AWS_ACCESS_KEY_ID}
+      - S3_SECRET_KEY=${AWS_SECRET_ACCESS_KEY}
+      - S3_BUCKET_DATASETS=datasets
+      - S3_BUCKET_RESULTS=results
+      - S3_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_ENDPOINT_URL_S3=http://minio:9000
+      - AWS_DEFAULT_REGION=us-east-1
+    depends_on:
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+      - ./common:/app/common
+      - ./models:/app/models
+    networks:
+      - app-network
+    restart: always
+
+  minio:
+    image: minio/minio:latest
+    # ports: "9000:9000" и "9001:9001" удалены
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_SERVER_URL: "http://localhost:9000"    # см. примечание ниже
+    volumes:
+      - minio-storage:/data
+      - minio-config:/root/.minio
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "sh", "-c", "echo > /dev/tcp/localhost/9000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  redis-storage:
+  minio-storage:
+  minio-config:
+  caddy_data:
