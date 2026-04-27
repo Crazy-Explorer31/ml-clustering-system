@@ -722,7 +722,7 @@
                 }
             }
             function getDefaultEmbeddingsJson(method) {
-                if (method === 'tfidf') return JSON.stringify({ max_df: 1.0, min_df: 1 }, null, 2);
+                if (method === 'tfidf') return JSON.stringify({ max_df: 0.015, min_df: 1 }, null, 2);
                 else if (method === 'word2vec') return JSON.stringify({ alpha: 0.025 }, null, 2);
                 else if (method === 'doc2vec') return JSON.stringify({ alpha: 0.025 }, null, 2);
                 else return JSON.stringify({ lr: 0.05, dim: 100, ws: 5, epoch: 5 }, null, 2);

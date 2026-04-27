@@ -398,7 +398,7 @@
             </div>
         </div>
         <footer>
-            <i class="fas fa-plug"></i> Подключение к бэкенду FastAPI /get_authorised_users • Данные хешей отображаются
+            <i class="fas fa-plug"></i> Подключение к бэкенду FastAPI /get_authorised_users • Данные отображаются
             в
             реальном времени
         </footer>
@@ -603,7 +603,7 @@
                     throw new Error('Неверный формат: ожидается объект ключ:словарь');
                 }
                 setNewData(payload, true);
-                showStatusMessage(`✅ Загружено ${Object.keys(payload).length} хешей из Redis`, false);
+                showStatusMessage(`✅ Загружено ${Object.keys(payload).length} пользователей`, false);
             } catch (err) {
                 console.error(err);
                 container.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:2rem; background:#171c2a; border-radius:2rem; color:#f9ac7c;">
