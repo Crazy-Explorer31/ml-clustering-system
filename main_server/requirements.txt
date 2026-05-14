@@ -11,3 +11,5 @@ bcrypt
 python-jose[cryptography]
 python-multipart
 dotenv
+matplotlib
+scikit-learn

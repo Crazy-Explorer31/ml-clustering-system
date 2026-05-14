@@ -9,7 +9,12 @@ import boto3
 from botocore.exceptions import ClientError
 import asyncio
 from fastapi.security import OAuth2PasswordRequestForm
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import (
+    HTMLResponse,
+    RedirectResponse,
+    Response,
+    StreamingResponse,
+)
 
 from redis import Redis
 from redis.exceptions import RedisError
@@ -25,6 +30,7 @@ from common.redis_operations import *
 from common.s3_operations import *
 from common.query_schemas import *
 from auth_utils import *
+from cluster_results_drawer import get_cluster_results_picture
 
 # ----------------------------------- Переменные окружения ---------------------------------------
 JOBS_SERVER_URL = os.getenv("JOBS_SERVER_URL", "http://localhost:8001")
@@ -35,6 +41,9 @@ S3_BUCKET_DATASETS = os.getenv("S3_BUCKET_DATASETS", "datasets")
 @asynccontextmanager
 async def ml_lifespan_manager(app: FastAPI):
     """Менеджер контекста приложения"""
+    app.state.jobs_pool = Redis(
+        host=REDIS_HOST, port=REDIS_PORT, db=1, decode_responses=True
+    )
     app.state.queries_history = Redis(
         host=REDIS_HOST, port=REDIS_PORT, db=3, decode_responses=True
     )
@@ -44,6 +53,7 @@ async def ml_lifespan_manager(app: FastAPI):
     yield
     app.state.authorised_users.close()
     app.state.queries_history.close()
+    app.state.jobs_pool.close()
 
 
 app = FastAPI(lifespan=ml_lifespan_manager)
@@ -280,6 +290,24 @@ async def job_result(
         return ClusteringResultResponse(download_url=url)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/job_plot/{job_id}")
+async def get_job_plot(job_id: str, user: str = Depends(get_current_user)):
+    # check res ready
+    try:
+        df = read_dataframe_from_s3(S3_BUCKET_RESULTS, f"{job_id}_full.csv")
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Результат ещё не готов"
+        )
+
+    df = read_dataframe_from_s3_with_header(S3_BUCKET_RESULTS, f"{job_id}_full.csv")
+    df.fillna(0, inplace=True)
+    df["cluster"] = df["cluster"].astype(int)
+    buf = get_cluster_results_picture(df)
+
+    return StreamingResponse(buf, media_type="image/png")
 
 
 @app.get("/ui", response_class=HTMLResponse)

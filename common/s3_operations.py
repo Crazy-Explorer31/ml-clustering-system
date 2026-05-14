@@ -63,6 +63,13 @@ def read_dataframe_from_s3(bucket: str, key: str) -> pd.DataFrame:
     return pd.read_csv(io.BytesIO(data))
 
 
+def read_dataframe_from_s3_with_header(bucket: str, key: str) -> pd.DataFrame:
+    s3_client = get_s3_client()
+    response = s3_client.get_object(Bucket=bucket, Key=key)
+    data = response["Body"].read()
+    return pd.read_csv(io.BytesIO(data), header=0)
+
+
 def write_dataframe_to_s3(df: pd.DataFrame, bucket: str, key: str) -> None:
     csv_buffer = io.StringIO()
     df.to_csv(csv_buffer, index=False)

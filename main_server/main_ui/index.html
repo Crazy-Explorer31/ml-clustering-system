@@ -882,10 +882,35 @@
                     if (!res.ok) throw new Error(data.detail || `Ошибка ${res.status}`);
                     const downloadUrl = data.download_url;
                     if (downloadUrl) {
-                        resultDisplay.innerHTML = `<div class="success-msg" style="display: flex; align-items: center; justify-content: space-between;">
-                            <span>Результат готов!</span>
-                            <a href="${downloadUrl}" target="_blank" class="download-link">Скачать CSV</a>
-                        </div>`;
+                        const plotUrl = `/job_plot/${encodeURIComponent(jobId)}`;
+                        // Показываем блок с кнопкой скачивания и контейнер для графика
+                        resultDisplay.innerHTML = `
+        <div class="success-msg" style="display: flex; align-items: center; justify-content: space-between;">
+            <span>✅ Результат готов!</span>
+            <a href="${downloadUrl}" target="_blank" class="download-link">Скачать CSV</a>
+        </div>
+        <div id="plot-container" style="margin-top: 1rem; text-align: center;">
+            <p>Загрузка графика...</p>
+        </div>`;
+
+                        // Загружаем картинку с авторизацией через fetch
+                        (async () => {
+                            try {
+                                const imgResponse = await authFetch(plotUrl);
+                                if (!imgResponse.ok) throw new Error(`Ошибка ${imgResponse.status}`);
+                                const blob = await imgResponse.blob();
+                                const imgUrl = URL.createObjectURL(blob);
+                                const plotContainer = document.getElementById('plot-container');
+                                if (plotContainer) {
+                                    plotContainer.innerHTML = `<img src="${imgUrl}" alt="График кластеризации" style="max-width: 100%; border-radius: 12px; border: 1px solid #334155;" />`;
+                                }
+                            } catch (e) {
+                                const plotContainer = document.getElementById('plot-container');
+                                if (plotContainer) {
+                                    plotContainer.innerHTML = `<p style="color:#fca5a5;">Не удалось загрузить график: ${e.message}</p>`;
+                                }
+                            }
+                        })();
                     } else {
                         throw new Error('Ссылка на скачивание не получена');
                     }

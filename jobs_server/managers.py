@@ -200,6 +200,11 @@ class ClusteringManager:
         try:
             data_clustered = clusterizer(data, clustering_hyperparams)
 
+            write_dataframe_to_s3(
+                pd.concat([data_clustered, data], axis=1),
+                S3_BUCKET_RESULTS,
+                f"{job_id}_full.csv",
+            )
             write_dataframe_to_s3(data_clustered, S3_BUCKET_RESULTS, f"{job_id}.csv")
         except:
             update_job_status(self.jobs_pool, job_id, "failed (find_clusters)")

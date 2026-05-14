@@ -19,13 +19,6 @@ SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production")  # TODO: load fr
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
-print(ADMIN_USERNAME)
-print(ADMIN_USERNAME)
-print(ADMIN_USERNAME)
-print(ADMIN_USERNAME)
-print(ADMIN_USERNAME)
-print(ADMIN_USERNAME)
-print(ADMIN_USERNAME)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
