@@ -382,6 +382,15 @@
             background: #22c55e;
             box-shadow: 0 0 6px #22c55e;
         }
+
+        /* Стиль для поля загрузки файла */
+        input[type="file"] {
+            background: #1e293b;
+            color: #f1f5f9;
+            border: 1.5px solid #334155;
+            border-radius: 14px;
+            padding: 0.6rem 1rem;
+        }
     </style>
 </head>
 
@@ -401,6 +410,21 @@
             <div class="auth-status" id="auth-status">⚪ Не авторизован</div>
         </div>
 
+        <!-- Загрузка датасета (перед формой кластеризации) -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Загрузка датасета</h2>
+                <span class="badge">POST /upload_dataset</span>
+            </div>
+            <form id="upload-form" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                <input type="file" id="dataset-file" name="file" accept=".csv,.txt,.json"
+                    style="flex: 2; min-width: 220px;">
+                <button type="submit" class="btn">Загрузить</button>
+                <span id="upload-status" style="color:#94a3b8;"></span>
+            </form>
+            <div id="upload-result" style="margin-top: 0.5rem;"></div>
+        </div>
+
         <!-- Форма создания задачи -->
         <div class="card">
             <div class="card-header">
@@ -411,9 +435,7 @@
                 <div class="form-grid">
                     <div class="full-width">
                         <label>Датасет</label>
-                        <select id="dataset-id">
-                            <option value="data" selected>data (основной набор)</option>
-                        </select>
+                        <input type="text" id="dataset-id" placeholder="Введите название датасета" value="data">
                     </div>
                     <div>
                         <label>Алгоритм кластеризации</label>
@@ -506,8 +528,13 @@
             const logoutBtn = document.getElementById('logout-btn');
             const authStatus = document.getElementById('auth-status');
 
+            const uploadForm = document.getElementById('upload-form');
+            const datasetFile = document.getElementById('dataset-file');
+            const uploadStatus = document.getElementById('upload-status');
+            const uploadResult = document.getElementById('upload-result');
+
             const form = document.getElementById('clustering-form');
-            const datasetSelect = document.getElementById('dataset-id');
+            const datasetInput = document.getElementById('dataset-id');
             const clusteringAlgoSelect = document.getElementById('clustering-algo');
             const embeddingsMethodSelect = document.getElementById('embeddings-method');
             const clusteringJsonTextarea = document.getElementById('clustering-hyperparams-json');
@@ -550,8 +577,8 @@
             updateAuthUI();
 
             function clearError() { errorDisplay.innerHTML = ''; }
-            function showError(text) { errorDisplay.innerHTML = `<div class="error-msg">❌ ${text}</div>`; }
-            function showSuccess(text) { errorDisplay.innerHTML = `<div class="success-msg">✅ ${text}</div>`; }
+            function showError(text) { errorDisplay.innerHTML = `<div class="error-msg">${text}</div>`; }
+            function showSuccess(text) { errorDisplay.innerHTML = `<div class="success-msg">${text}</div>`; }
 
             async function loadRootInfo() {
                 try {
@@ -620,6 +647,36 @@
                 return response;
             }
 
+            // ---------- Загрузка датасета ----------
+            uploadForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const file = datasetFile.files[0];
+                if (!file) {
+                    uploadResult.innerHTML = '<div class="error-msg">Выберите файл</div>';
+                    return;
+                }
+                uploadStatus.textContent = 'Загрузка...';
+                const formData = new FormData();
+                formData.append('file', file);
+                try {
+                    const response = await authFetch('/upload_dataset', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) throw new Error(data.detail || `Ошибка ${response.status}`);
+                    const datasetId = data.dataset_id || '—';
+                    uploadResult.innerHTML = `<div class="success-msg">Файл загружен!</div>`;
+                    if (data.dataset_id) {
+                        datasetInput.value = data.dataset_id;
+                    }
+                    uploadStatus.textContent = '';
+                } catch (err) {
+                    uploadResult.innerHTML = `<div class="error-msg">${err.message}</div>`;
+                    uploadStatus.textContent = 'Ошибка';
+                }
+            });
+
             // ---------- Опрос статуса ----------
             async function updateJobInfo(jobId) {
                 if (!jobId) return;
@@ -653,7 +710,6 @@
                     </div>`;
                     }
                     jobInfoDisplay.innerHTML = html;
-                    // Если статус конечный, останавливаем опрос
                     if (status === 'done' || status === 'failed') {
                         stopPolling();
                         if (status === 'done') {
@@ -673,14 +729,12 @@
 
             function startPolling(jobId) {
                 if (!jobId) return;
-                // Остановить предыдущий опрос, если был
                 stopPolling();
                 currentPollingJobId = jobId;
-                pollingIntervalId = setInterval(() => updateJobInfo(jobId), 5000); // каждые 5 сек
+                pollingIntervalId = setInterval(() => updateJobInfo(jobId), 5000);
                 pollIndicator.classList.add('poll-active');
                 pollStatusText.textContent = 'активно';
                 togglePollBtn.textContent = '⏹ Остановить';
-                // Сразу сделать первый запрос
                 updateJobInfo(jobId);
             }
 
@@ -706,7 +760,6 @@
                 }
             });
 
-            // При изменении поля ID сбрасываем автоопрос
             jobIdInput.addEventListener('input', () => {
                 if (pollingIntervalId) {
                     stopPolling();
@@ -750,7 +803,7 @@
                 e.preventDefault();
                 clearError();
                 jobCreatedInfo.innerHTML = '';
-                formStatus.textContent = '⏳ Отправка...';
+                formStatus.textContent = 'Отправка...';
                 let clusteringParams, embeddingsParams;
                 try {
                     clusteringParams = JSON.parse(clusteringJsonTextarea.value.trim() || '{}');
@@ -767,7 +820,7 @@
                     return;
                 }
                 const payload = {
-                    dataset_id: datasetSelect.value,
+                    dataset_id: datasetInput.value.trim() || 'data',
                     clustering_algo: clusteringAlgoSelect.value,
                     embeddings_method: embeddingsMethodSelect.value,
                     clustering_hyperparams: clusteringParams,
@@ -783,14 +836,13 @@
                     if (!response.ok) throw new Error(data.detail || `Ошибка ${response.status}`);
                     const jobId = data.job_id;
                     if (jobId) {
-                        jobCreatedInfo.innerHTML = `<div class="success-msg">✅ Задача принята! ID: <strong>${jobId}</strong></div>`;
+                        jobCreatedInfo.innerHTML = `<div class="success-msg">Задача принята! ID: <strong>${jobId}</strong></div>`;
                         jobIdInput.value = jobId;
                         formStatus.textContent = 'Готово';
                         resultDisplay.innerHTML = '';
-                        // Автоматически запустить отслеживание
                         startPolling(jobId);
                     } else {
-                        jobCreatedInfo.innerHTML = `<div class="success-msg">✅ Задача принята, но ID не получен</div>`;
+                        jobCreatedInfo.innerHTML = `<div class="success-msg">Задача принята, но ID не получен</div>`;
                     }
                 } catch (err) {
                     showError(err.message);
@@ -807,7 +859,6 @@
                 if (!jobId) { showError('Введите ID задачи'); return; }
                 clearError();
                 resultDisplay.innerHTML = '';
-                // Не останавливаем автоопрос, просто делаем разовый запрос
                 await updateJobInfo(jobId);
             });
 
@@ -832,7 +883,7 @@
                     const downloadUrl = data.download_url;
                     if (downloadUrl) {
                         resultDisplay.innerHTML = `<div class="success-msg" style="display: flex; align-items: center; justify-content: space-between;">
-                            <span>✅ Результат готов!</span>
+                            <span>Результат готов!</span>
                             <a href="${downloadUrl}" target="_blank" class="download-link">Скачать CSV</a>
                         </div>`;
                     } else {

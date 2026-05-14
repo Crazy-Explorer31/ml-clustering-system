@@ -70,7 +70,7 @@ def write_dataframe_to_s3(df: pd.DataFrame, bucket: str, key: str) -> None:
     s3_client = get_s3_client()
     s3_client.put_object(
         Bucket=bucket,
-        Key=f"{key}.csv",
+        Key=f"{key}",
         Body=csv_buffer.getvalue().encode("utf-8"),
         ContentType="text/csv",
     )

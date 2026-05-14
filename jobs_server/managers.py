@@ -158,7 +158,7 @@ class EmbeddingsCacheManager:
         dataset_id, embeddings_method, embeddings_hyperparams = embeddings_key
 
         try:
-            dataset = read_dataframe_from_s3(S3_BUCKET_DATASETS, f"{dataset_id}.csv")
+            dataset = read_dataframe_from_s3(S3_BUCKET_DATASETS, f"{dataset_id}")
             print(dataset.head(), flush=True)
             vectorizer = vectorizers[embeddings_method]
             dataset_vectorized = vectorizer(dataset, embeddings_hyperparams)
@@ -200,6 +200,6 @@ class ClusteringManager:
         try:
             data_clustered = clusterizer(data, clustering_hyperparams)
 
-            write_dataframe_to_s3(data_clustered, S3_BUCKET_RESULTS, job_id)
+            write_dataframe_to_s3(data_clustered, S3_BUCKET_RESULTS, f"{job_id}.csv")
         except:
             update_job_status(self.jobs_pool, job_id, "failed (find_clusters)")

@@ -4,7 +4,10 @@ from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
 from typing import Annotated
 from fastapi.staticfiles import StaticFiles
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status, FastAPI, File, UploadFile
+import boto3
+from botocore.exceptions import ClientError
+import asyncio
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
@@ -25,6 +28,7 @@ from auth_utils import *
 
 # ----------------------------------- Переменные окружения ---------------------------------------
 JOBS_SERVER_URL = os.getenv("JOBS_SERVER_URL", "http://localhost:8001")
+S3_BUCKET_DATASETS = os.getenv("S3_BUCKET_DATASETS", "datasets")
 
 
 # ----------------------------------- Функции FastAPI сервиса ------------------------------------
@@ -111,6 +115,38 @@ async def login_for_access_token(
 @app.get("/")
 async def root():
     return RedirectResponse(url="/ui")
+
+
+@app.post("/upload_dataset")
+async def upload_csv(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
+):
+    # Проверка на CSV (опционально)
+    if not file.filename.endswith(".csv") and file.content_type != "text/csv":
+        raise HTTPException(status_code=400, detail="Файл должен быть в формате CSV")
+
+    dataset_key = f"{current_user.username}/{file.filename}"
+
+    s3_client = get_s3_client()
+    try:
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: s3_client.upload_fileobj(
+                file.file, S3_BUCKET_DATASETS, dataset_key
+            ),
+        )
+    except ClientError as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка загрузки в S3: {e}")
+    finally:
+        await file.close()
+
+    return {
+        "message": "Файл успешно загружен",
+        "bucket": S3_BUCKET_DATASETS,
+        "key": dataset_key,
+    }
 
 
 @app.post(
