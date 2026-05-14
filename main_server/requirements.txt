@@ -10,3 +10,4 @@ debugpy
 bcrypt
 python-jose[cryptography]
 python-multipart
+dotenv

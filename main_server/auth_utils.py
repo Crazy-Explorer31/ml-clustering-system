@@ -1,4 +1,5 @@
 import os
+from dotenv import load_dotenv
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -8,10 +9,23 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel
 
-# Конфигурация JWT
-SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production")
+# -----------------------Конфигурация JWT---------------------------
+
+# Загружаем переменные из .env
+load_dotenv()
+
+# Глобальные переменные
+SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production")  # TODO: load from .env
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+print(ADMIN_USERNAME)
+print(ADMIN_USERNAME)
+print(ADMIN_USERNAME)
+print(ADMIN_USERNAME)
+print(ADMIN_USERNAME)
+print(ADMIN_USERNAME)
+print(ADMIN_USERNAME)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -100,16 +114,28 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 
 # Зависимости FastAPI
-def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    request: Request = None,
-) -> UserInDB:
+def get_current_user(request: Request) -> UserInDB:
     """Извлекает текущего пользователя по JWT."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Не удалось проверить учётные данные",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    # 1. Пробуем получить токен из куки (для браузерных запросов)
+    token = request.cookies.get("access_token")
+
+    # 2. Если куки нет — ищем в заголовке Authorization (для API)
+    if not token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+
+    # 3. Если токена нет нигде — ошибка
+    if not token:
+        raise credentials_exception
+
+    # 4. Декодируем токен
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
@@ -118,7 +144,7 @@ def get_current_user(
     except JWTError:
         raise credentials_exception
 
-    # Получаем клиент Redis из состояния приложения
+    # 5. Получаем пользователя из Redis
     redis = request.app.state.authorised_users
     user = get_user(redis, username)
     if user is None:
@@ -131,4 +157,13 @@ def get_current_active_user(
 ):
     if current_user.disabled:
         raise HTTPException(status_code=400, detail="Неактивный пользователь")
+    return current_user
+
+
+async def get_current_admin_user(current_user: User = Depends(get_current_active_user)):
+    print(current_user.username, ADMIN_USERNAME)
+    if current_user.username != ADMIN_USERNAME:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Только для администратора"
+        )
     return current_user

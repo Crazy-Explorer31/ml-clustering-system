@@ -6,7 +6,7 @@ from typing import Annotated
 from fastapi.staticfiles import StaticFiles
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from redis import Redis
 from redis.exceptions import RedisError
@@ -22,7 +22,6 @@ from common.redis_operations import *
 from common.s3_operations import *
 from common.query_schemas import *
 from auth_utils import *
-
 
 # ----------------------------------- Переменные окружения ---------------------------------------
 JOBS_SERVER_URL = os.getenv("JOBS_SERVER_URL", "http://localhost:8001")
@@ -69,6 +68,7 @@ async def register(user: UserCreate, request: Request):
 async def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     request: Request = None,
+    response: Response = None,
 ):
     user = authenticate_user(
         app.state.authorised_users, form_data.username, form_data.password
@@ -82,6 +82,16 @@ async def login_for_access_token(
     access_token = create_access_token(
         data={"sub": user.username},
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        path="/",  # ← кука доступна на всех путях
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
 
     save_query(
@@ -98,17 +108,9 @@ async def login_for_access_token(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@app.get(
-    "/",
-    status_code=200,
-    response_model=None,
-    description="Корневая страница сервера-обработчика пользовательских запросов",
-)
-async def root() -> Annotated[dict, "Метаданные корневой страницы"]:
-    return {
-        "Name": "Система кластеризации медицинских документов",
-        "Description": "Предоставляет возможности для загрузки своих задач кластеризации и получения результатов их выполнения",
-    }
+@app.get("/")
+async def root():
+    return RedirectResponse(url="/ui")
 
 
 @app.post(
@@ -244,25 +246,29 @@ async def job_result(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-app.mount("/ui", StaticFiles(directory="main_ui", html=True), name="main_ui")
+@app.get("/ui", response_class=HTMLResponse)
+@app.get("/ui/", response_class=HTMLResponse)
+async def serve_main_ui():
+    with open("main_ui/index.html", "r", encoding="utf-8") as f:
+        return f.read()
 
 
 @app.get("/authorised_users_ui", response_class=HTMLResponse)
-async def serve_index():
+async def serve_authorised_users_ui(admin: User = Depends(get_current_admin_user)):
     with open("authorised_users_ui/index.html", "r", encoding="utf-8") as f:
         html_content = f.read()
     return html_content
 
 
 @app.get("/queries_history_ui", response_class=HTMLResponse)
-async def serve_index():
+async def serve_queries_history_ui(admin: User = Depends(get_current_admin_user)):
     with open("queries_history_ui/index.html", "r", encoding="utf-8") as f:
         html_content = f.read()
     return html_content
 
 
 @app.get("/get_queries_history")
-async def get_queries_history():
+async def get_queries_history(admin: User = Depends(get_current_admin_user)):
     """
     Возвращает все ключи-хеши из Redis и их поля/значения.
     Игнорируются ключи других типов (строки, списки и т.п.).
@@ -287,7 +293,7 @@ async def get_queries_history():
 
 
 @app.get("/get_authorised_users")
-async def get_authorised_users():
+async def get_authorised_users(admin: User = Depends(get_current_admin_user)):
     """
     Возвращает все ключи-хеши из Redis и их поля/значения.
     Игнорируются ключи других типов (строки, списки и т.п.).
@@ -310,3 +316,21 @@ async def get_authorised_users():
         return result
     except RedisError as e:
         return {"error": f"Ошибка Redis: {str(e)}"}
+
+
+@app.exception_handler(HTTPException)
+async def auth_exception_handler(request: Request, exc: HTTPException):
+    if exc.status_code in {401, 403}:
+        # запомним, куда хотел попасть пользователь
+        next_url = str(request.url.path)
+        if next_url not in ("/ui", "/ui/"):
+            redirect_url = f"/ui?next={next_url}"
+        else:
+            redirect_url = "/ui"
+        return RedirectResponse(url=redirect_url, status_code=303)
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
+@app.get("/{full_path:path}")
+async def catch_all(full_path: str):
+    return RedirectResponse(url="/ui")

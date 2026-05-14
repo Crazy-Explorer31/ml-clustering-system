@@ -387,16 +387,16 @@
 
 <body>
     <div class="container">
-        <h1>🧬 Кластеризация медицинских документов</h1>
+        <h1>Кластеризация медицинских документов</h1>
         <div id="root-description" class="subtitle">Загрузка описания сервиса...</div>
 
         <!-- Блок авторизации -->
         <div class="auth-section">
             <div class="auth-fields">
-                <input type="text" id="username-input" placeholder="Логин" value="johndoe">
-                <input type="password" id="password-input" placeholder="Пароль" value="secret">
-                <button id="login-btn" class="btn btn-small">🔐 Войти</button>
-                <button id="logout-btn" class="btn-outline btn-small" style="display:none;">🚪 Выйти</button>
+                <input type="text" id="username-input" placeholder="Логин" value="">
+                <input type="password" id="password-input" placeholder="Пароль" value="">
+                <button id="login-btn" class="btn btn-small">Войти</button>
+                <button id="logout-btn" class="btn-outline btn-small" style="display:none;">Выйти</button>
             </div>
             <div class="auth-status" id="auth-status">⚪ Не авторизован</div>
         </div>
@@ -404,26 +404,26 @@
         <!-- Форма создания задачи -->
         <div class="card">
             <div class="card-header">
-                <h2>📤 Новая задача кластеризации</h2>
+                <h2>Новая задача кластеризации</h2>
                 <span class="badge">POST /perform_clustering</span>
             </div>
             <form id="clustering-form">
                 <div class="form-grid">
                     <div class="full-width">
-                        <label>📁 Датасет</label>
+                        <label>Датасет</label>
                         <select id="dataset-id">
                             <option value="data" selected>data (основной набор)</option>
                         </select>
                     </div>
                     <div>
-                        <label>🧩 Алгоритм кластеризации</label>
+                        <label>Алгоритм кластеризации</label>
                         <select id="clustering-algo">
                             <option value="kmeans" selected>k-means</option>
                             <option value="spectral">spectral</option>
                         </select>
                     </div>
                     <div>
-                        <label>🔤 Метод эмбеддингов</label>
+                        <label>Метод эмбеддингов</label>
                         <select id="embeddings-method">
                             <option value="tfidf" selected>TF-IDF</option>
                             <option value="word2vec">Word2Vec</option>
@@ -436,7 +436,7 @@
                 <div class="full-width" style="margin-top: 1rem;">
                     <div class="param-group">
                         <div class="json-header">
-                            <span style="font-weight:500; color:#a5b4cb;">⚙️ Гиперпараметры кластеризации (JSON)</span>
+                            <span style="font-weight:500; color:#a5b4cb;">Гиперпараметры кластеризации (JSON)</span>
                             <button type="button" id="reset-clustering-json">↺ Пример</button>
                         </div>
                         <textarea id="clustering-hyperparams-json" rows="4">{"n_clusters": 8}</textarea>
@@ -444,7 +444,7 @@
                     </div>
                     <div class="param-group" style="margin-top: 1rem;">
                         <div class="json-header">
-                            <span style="font-weight:500; color:#a5b4cb;">📐 Гиперпараметры эмбеддингов (JSON)</span>
+                            <span style="font-weight:500; color:#a5b4cb;">Гиперпараметры эмбеддингов (JSON)</span>
                             <button type="button" id="reset-embeddings-json">↺ Пример</button>
                         </div>
                         <textarea id="embeddings-hyperparams-json" rows="4">{}</textarea>
@@ -453,7 +453,7 @@
                 </div>
 
                 <div class="action-bar">
-                    <button type="submit" class="btn">🚀 Отправить задачу</button>
+                    <button type="submit" class="btn">Отправить задачу</button>
                     <span id="form-status" style="color:#94a3b8;"></span>
                 </div>
             </form>
@@ -463,18 +463,18 @@
         <!-- Блок проверки статуса и результата -->
         <div class="card">
             <div class="card-header">
-                <h2>🔍 Информация о задаче</h2>
+                <h2>Информация о задаче</h2>
                 <span class="badge">GET /job_info/{job_id}</span>
             </div>
             <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
                 <div style="flex:3; min-width: 220px;">
-                    <label>🆔 ID задачи</label>
+                    <label>ID задачи</label>
                     <input type="text" id="job-id-input" placeholder="например: abcde_123" class="job-id-input">
                 </div>
                 <div style="display: flex; gap: 0.8rem; align-items: center;">
-                    <button id="check-info-btn" class="btn-outline">📋 Статус</button>
-                    <button id="get-result-btn" class="btn-outline">📥 Получить результат</button>
-                    <button id="toggle-poll-btn" class="btn-outline" title="Автообновление статуса">🔄
+                    <button id="check-info-btn" class="btn-outline">Статус</button>
+                    <button id="get-result-btn" class="btn-outline">Получить результат</button>
+                    <button id="toggle-poll-btn" class="btn-outline" title="Автообновление статуса">
                         Отслеживать</button>
                     <span id="poll-indicator" class="poll-indicator">
                         <span class="poll-dot"></span> <span id="poll-status-text">остановлено</span>
@@ -492,7 +492,7 @@
 
         <hr>
         <div class="footer-note">
-            ⚡ UI для сервиса кластеризации
+            UI для сервиса кластеризации
         </div>
     </div>
 
@@ -573,7 +573,7 @@
                     return;
                 }
                 clearError();
-                authStatus.innerHTML = '⏳ Вход...';
+                authStatus.innerHTML = 'Вход...';
                 const formData = new URLSearchParams();
                 formData.append('username', username);
                 formData.append('password', password);
@@ -641,15 +641,15 @@
                                     status === 'failed' ? 'ОШИБКА' : status.toUpperCase();
 
                     let html = `<div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
-                        <span class="status-chip ${statusClass}">📌 ${statusText}</span>
+                        <span class="status-chip ${statusClass}">${statusText}</span>
                         <span><strong>Датасет:</strong> ${info.dataset_id || '—'}</span>
                         <span><strong>Алгоритм:</strong> ${info.clustering_algo || '—'}</span>
                         <span><strong>Эмбеддинги:</strong> ${info.embeddings_method || '—'}</span>
                     </div>`;
                     if (info.clustering_hyperparams || info.embeddings_hyperparams) {
                         html += `<div style="margin-top: 1.2rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                        <div><strong>🧪 Параметры кластеризации</strong><pre>${JSON.stringify(info.clustering_hyperparams, null, 2)}</pre></div>
-                        <div><strong>📊 Параметры эмбеддингов</strong><pre>${JSON.stringify(info.embeddings_hyperparams, null, 2)}</pre></div>
+                        <div><strong>Параметры кластеризации</strong><pre>${JSON.stringify(info.clustering_hyperparams, null, 2)}</pre></div>
+                        <div><strong>Параметры эмбеддингов</strong><pre>${JSON.stringify(info.embeddings_hyperparams, null, 2)}</pre></div>
                     </div>`;
                     }
                     jobInfoDisplay.innerHTML = html;
@@ -692,7 +692,7 @@
                 currentPollingJobId = null;
                 pollIndicator.classList.remove('poll-active');
                 pollStatusText.textContent = 'остановлено';
-                togglePollBtn.textContent = '🔄 Отслеживать';
+                togglePollBtn.textContent = 'Отслеживать';
             }
 
             togglePollBtn.addEventListener('click', () => {
@@ -796,7 +796,7 @@
                     showError(err.message);
                     formStatus.textContent = 'Ошибка';
                 } finally {
-                    if (formStatus.textContent === '⏳ Отправка...') formStatus.textContent = '';
+                    if (formStatus.textContent === 'Отправка...') formStatus.textContent = '';
                 }
             });
 
@@ -817,7 +817,7 @@
                 const jobId = jobIdInput.value.trim();
                 if (!jobId) { showError('Введите ID задачи'); return; }
                 clearError();
-                resultDisplay.innerHTML = '<p>⏳ Проверка готовности результата...</p>';
+                resultDisplay.innerHTML = '<p>Проверка готовности результата...</p>';
                 try {
                     const infoRes = await authFetch(`/job_info/${encodeURIComponent(jobId)}`);
                     const info = await infoRes.json();
@@ -833,7 +833,7 @@
                     if (downloadUrl) {
                         resultDisplay.innerHTML = `<div class="success-msg" style="display: flex; align-items: center; justify-content: space-between;">
                             <span>✅ Результат готов!</span>
-                            <a href="${downloadUrl}" target="_blank" class="download-link">📥 Скачать CSV</a>
+                            <a href="${downloadUrl}" target="_blank" class="download-link">Скачать CSV</a>
                         </div>`;
                     } else {
                         throw new Error('Ссылка на скачивание не получена');

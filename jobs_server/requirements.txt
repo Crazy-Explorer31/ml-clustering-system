@@ -13,3 +13,4 @@ fasttext-wheel
 scikit-learn
 nltk
 debugpy
+dotenv

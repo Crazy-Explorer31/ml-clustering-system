@@ -29,6 +29,7 @@ services:
     volumes:
       - ./logs:/app/logs
       - ./common:/app/common
+      - ./.env:/app/.env
     networks:
       - app-network
     restart: always
