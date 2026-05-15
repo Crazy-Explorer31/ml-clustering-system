@@ -18,14 +18,7 @@ services:
     depends_on:
       jobs_server:
         condition: service_healthy
-    environment:
-      - JOBS_SERVER_URL=http://jobs_server:8001
-      - S3_ENDPOINT_URL=http://minio:9000
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_ENDPOINT_URL_S3=http://minio:9000
-      - AWS_DEFAULT_REGION=us-east-1
-      - S3_BUCKET_RESULTS=results
+    env_file: ./.env
     volumes:
       - ./logs:/app/logs
       - ./common:/app/common
@@ -37,19 +30,10 @@ services:
   jobs_server:
     build:
       context: ./jobs_server
-    # ports: "8001:8001"  удалён
     volumes:
       - ./logs:/app/logs
       - ./common:/app/common
-    environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - S3_ENDPOINT_URL=http://minio:9000
-      - S3_ACCESS_KEY=${AWS_ACCESS_KEY_ID}
-      - S3_SECRET_KEY=${AWS_SECRET_ACCESS_KEY}
-      - S3_BUCKET_DATASETS=datasets
-      - S3_BUCKET_RESULTS=results
-      - S3_REGION=us-east-1
+    env_file: ./.env
     depends_on:
       minio:
         condition: service_healthy
@@ -66,7 +50,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    # ports: "6379:6379" удалён
     volumes:
       - redis-storage:/data
     command: redis-server --appendonly yes --save 900 1 --save 300 10 --save 60 10000
@@ -83,19 +66,7 @@ services:
     build:
       context: ./jobs_server
     command: rq worker --url redis://redis:6379/2
-    environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - S3_ENDPOINT_URL=http://minio:9000
-      - S3_ACCESS_KEY=${AWS_ACCESS_KEY_ID}
-      - S3_SECRET_KEY=${AWS_SECRET_ACCESS_KEY}
-      - S3_BUCKET_DATASETS=datasets
-      - S3_BUCKET_RESULTS=results
-      - S3_REGION=us-east-1
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_ENDPOINT_URL_S3=http://minio:9000
-      - AWS_DEFAULT_REGION=us-east-1
+    env_file: ./.env
     depends_on:
       redis:
         condition: service_healthy

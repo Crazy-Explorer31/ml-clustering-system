@@ -1,4 +1,3 @@
-import os
 import sys
 
 import pandas as pd
@@ -17,9 +16,6 @@ from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from gensim.utils import simple_preprocess
 
 from sklearn.cluster import KMeans, SpectralClustering
-
-REDIS_HOST = os.getenv("REDIS_HOST", "redis")
-REDIS_PORT = os.getenv("REDIS_PORT", "6379")
 
 
 # ----------------------------------- Функции вычисления эмбеддингов -------------------------------
@@ -113,23 +109,8 @@ def cluster_spectral(data, cluster_params):
 
 
 clusterizers = {"kmeans": cluster_kmeans, "spectral": cluster_spectral}
-# TODO
-# графически изобразить
-# выдавать картинку через s3
-# нужен веб интерфейс
-# просто страницу описать на js(react)
-
-# TODO
-# добавить авторизацию
-
-# TODO
-# ассоциировать responses с пользователями
-#   отдельная база данных для пользовательских данных (можно хранить на main_server)
-#   в эту базу логировать все пользовательские запросы (их действия)
 
 
-# TODO
-# для S3 хранилища сделать удаленный сервер
 # ----------------------------------- Классы менеджеров ------------------------------------------
 def get_hash(embeddings_key: tuple):
     return " ".join(map(str, embeddings_key))

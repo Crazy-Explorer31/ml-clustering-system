@@ -385,13 +385,16 @@ async def get_authorised_users(admin: User = Depends(get_current_admin_user)):
 @app.exception_handler(HTTPException)
 async def auth_exception_handler(request: Request, exc: HTTPException):
     if exc.status_code in {401, 403}:
-        # запомним, куда хотел попасть пользователь
-        next_url = str(request.url.path)
-        if next_url not in ("/ui", "/ui/"):
-            redirect_url = f"/ui?next={next_url}"
-        else:
-            redirect_url = "/ui"
-        return RedirectResponse(url=redirect_url, status_code=303)
+        # Редирект только для HTML-страниц интерфейса
+        if request.url.path.rstrip("/") in (
+            "/ui",
+            "/",
+            "/authorised_users_ui",
+            "/queries_history_ui",
+        ):
+            return RedirectResponse(url="/ui", status_code=303)
+        # Для всех API-запросов возвращаем JSON-ошибку
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 

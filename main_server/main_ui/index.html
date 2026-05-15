@@ -883,7 +883,6 @@
                     const downloadUrl = data.download_url;
                     if (downloadUrl) {
                         const plotUrl = `/job_plot/${encodeURIComponent(jobId)}`;
-                        // Показываем блок с кнопкой скачивания и контейнер для графика
                         resultDisplay.innerHTML = `
         <div class="success-msg" style="display: flex; align-items: center; justify-content: space-between;">
             <span>✅ Результат готов!</span>
@@ -893,18 +892,26 @@
             <p>Загрузка графика...</p>
         </div>`;
 
-                        // Загружаем картинку с авторизацией через fetch
+                        // Загрузка картинки с авторизацией
                         (async () => {
                             try {
+                                console.log('Запрашиваю график:', plotUrl);
                                 const imgResponse = await authFetch(plotUrl);
-                                if (!imgResponse.ok) throw new Error(`Ошибка ${imgResponse.status}`);
+                                console.log('Статус ответа:', imgResponse.status);
+                                if (!imgResponse.ok) {
+                                    const errText = await imgResponse.text();
+                                    throw new Error(`Ошибка ${imgResponse.status}: ${errText}`);
+                                }
                                 const blob = await imgResponse.blob();
                                 const imgUrl = URL.createObjectURL(blob);
                                 const plotContainer = document.getElementById('plot-container');
                                 if (plotContainer) {
                                     plotContainer.innerHTML = `<img src="${imgUrl}" alt="График кластеризации" style="max-width: 100%; border-radius: 12px; border: 1px solid #334155;" />`;
+                                } else {
+                                    console.error('Контейнер plot-container не найден');
                                 }
                             } catch (e) {
+                                console.error('Ошибка загрузки графика:', e);
                                 const plotContainer = document.getElementById('plot-container');
                                 if (plotContainer) {
                                     plotContainer.innerHTML = `<p style="color:#fca5a5;">Не удалось загрузить график: ${e.message}</p>`;
