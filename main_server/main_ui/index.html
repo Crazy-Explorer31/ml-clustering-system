@@ -21,6 +21,57 @@
             color: #e2e8f0;
         }
 
+        .help-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #60a5fa;
+            background: #1e3a5f;
+            border: 1px solid #3b82f6;
+            border-radius: 50%;
+            margin-left: 8px;
+            cursor: help;
+            position: relative;
+            transition: all 0.2s;
+        }
+
+        .help-icon:hover {
+            background: #3b82f6;
+            color: white;
+            transform: scale(1.1);
+        }
+
+        /* Кастомный tooltip (лучше стандартного title) */
+        .help-icon::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #0f172a;
+            color: #e0f2fe;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            border: 1px solid #334155;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s;
+            pointer-events: none;
+            z-index: 10;
+            margin-bottom: 8px;
+        }
+
+        .help-icon:hover::after {
+            opacity: 1;
+            visibility: visible;
+        }
+
         .container {
             max-width: 1000px;
             width: 100%;
@@ -383,13 +434,17 @@
             box-shadow: 0 0 6px #22c55e;
         }
 
-        /* Стиль для поля загрузки файла */
         input[type="file"] {
             background: #1e293b;
             color: #f1f5f9;
             border: 1.5px solid #334155;
             border-radius: 14px;
             padding: 0.6rem 1rem;
+        }
+
+        .number-field {
+            background: #1e293b;
+            color: #f1f5f9;
         }
     </style>
 </head>
@@ -410,10 +465,12 @@
             <div class="auth-status" id="auth-status">⚪ Не авторизован</div>
         </div>
 
-        <!-- Загрузка датасета (перед формой кластеризации) -->
+        <!-- Загрузка датасета -->
         <div class="card">
             <div class="card-header">
-                <h2>Загрузка датасета</h2>
+                <h2>Загрузка датасета
+                    <span class="help-icon" title="Загружаются .csv файлы с колонкой `text`">?</span>
+                </h2>
                 <span class="badge">POST /upload_dataset</span>
             </div>
             <form id="upload-form" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
@@ -449,9 +506,15 @@
                         <select id="embeddings-method">
                             <option value="tfidf" selected>TF-IDF</option>
                             <option value="word2vec">Word2Vec</option>
-                            <option value="fasttext">FastText</option>
                             <option value="doc2vec">Doc2Vec</option>
                         </select>
+                    </div>
+                    <!-- Поле theme_length -->
+                    <div>
+                        <label>Длина темы (theme_length)</label>
+                        <input type="number" id="theme-length" class="number-field" value="5" min="1" max="50" step="1"
+                            placeholder="Количество тем (целое число)">
+                        <div class="hint">Количество тем для выделения (≥ 1)</div>
                     </div>
                 </div>
 
@@ -537,6 +600,7 @@
             const datasetInput = document.getElementById('dataset-id');
             const clusteringAlgoSelect = document.getElementById('clustering-algo');
             const embeddingsMethodSelect = document.getElementById('embeddings-method');
+            const themeLengthInput = document.getElementById('theme-length');
             const clusteringJsonTextarea = document.getElementById('clustering-hyperparams-json');
             const embeddingsJsonTextarea = document.getElementById('embeddings-hyperparams-json');
             const resetClusteringBtn = document.getElementById('reset-clustering-json');
@@ -591,7 +655,6 @@
                 }
             }
 
-            // ---------- Логика авторизации ----------
             loginBtn.addEventListener('click', async () => {
                 const username = usernameInput.value.trim();
                 const password = passwordInput.value;
@@ -647,7 +710,6 @@
                 return response;
             }
 
-            // ---------- Загрузка датасета ----------
             uploadForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const file = datasetFile.files[0];
@@ -665,7 +727,6 @@
                     });
                     const data = await response.json().catch(() => ({}));
                     if (!response.ok) throw new Error(data.detail || `Ошибка ${response.status}`);
-                    const datasetId = data.dataset_id || '—';
                     uploadResult.innerHTML = `<div class="success-msg">Файл загружен!</div>`;
                     if (data.dataset_id) {
                         datasetInput.value = data.dataset_id;
@@ -677,7 +738,7 @@
                 }
             });
 
-            // ---------- Опрос статуса ----------
+            // ---------- Опрос статуса с отображением theme_length ----------
             async function updateJobInfo(jobId) {
                 if (!jobId) return;
                 try {
@@ -697,19 +758,34 @@
                                 status === 'done' ? 'ГОТОВО' :
                                     status === 'failed' ? 'ОШИБКА' : status.toUpperCase();
 
+                    // Основная строка с краткой информацией
                     let html = `<div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
                         <span class="status-chip ${statusClass}">${statusText}</span>
                         <span><strong>Датасет:</strong> ${info.dataset_id || '—'}</span>
                         <span><strong>Алгоритм:</strong> ${info.clustering_algo || '—'}</span>
                         <span><strong>Эмбеддинги:</strong> ${info.embeddings_method || '—'}</span>
                     </div>`;
+
+                    // Блоки гиперпараметров
                     if (info.clustering_hyperparams || info.embeddings_hyperparams) {
                         html += `<div style="margin-top: 1.2rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                        <div><strong>Параметры кластеризации</strong><pre>${JSON.stringify(info.clustering_hyperparams, null, 2)}</pre></div>
-                        <div><strong>Параметры эмбеддингов</strong><pre>${JSON.stringify(info.embeddings_hyperparams, null, 2)}</pre></div>
-                    </div>`;
+                            <div><strong>Параметры кластеризации</strong><pre>${JSON.stringify(info.clustering_hyperparams, null, 2)}</pre></div>
+                            <div><strong>Параметры эмбеддингов</strong><pre>${JSON.stringify(info.embeddings_hyperparams, null, 2)}</pre></div>
+                        </div>`;
                     }
+
+                    // Добавляем отображение theme_length под параметрами эмбеддингов (или отдельно, если параметров нет)
+                    if (info.theme_length !== undefined && info.theme_length !== null) {
+                        html += `<div style="margin-top: 1rem; border-top: 1px solid #334155; padding-top: 0.8rem;">
+                            <strong>📏 Длина темы (theme_length):</strong> ${info.theme_length}
+                        </div>`;
+                    } else if (info.theme_length === undefined) {
+                        // Если сервер не возвращает поле, можно показать заглушку (опционально)
+                        // html += `<div style="margin-top: 1rem;"><em>theme_length не указан</em></div>`;
+                    }
+
                     jobInfoDisplay.innerHTML = html;
+
                     if (status === 'done' || status === 'failed') {
                         stopPolling();
                         if (status === 'done') {
@@ -778,7 +854,7 @@
                 if (method === 'tfidf') return JSON.stringify({ max_df: 0.015, min_df: 1 }, null, 2);
                 else if (method === 'word2vec') return JSON.stringify({ alpha: 0.025 }, null, 2);
                 else if (method === 'doc2vec') return JSON.stringify({ alpha: 0.025 }, null, 2);
-                else return JSON.stringify({ lr: 0.05, dim: 100, ws: 5, epoch: 5 }, null, 2);
+                else return JSON.stringify({}, null, 2);
             }
             function updateJsonExamples() {
                 clusteringJsonTextarea.value = getDefaultClusteringJson(clusteringAlgoSelect.value);
@@ -798,12 +874,25 @@
             });
             updateJsonExamples();
 
-            // ---------- Отправка задачи ----------
+            // ---------- Отправка задачи с theme_length ----------
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 clearError();
                 jobCreatedInfo.innerHTML = '';
                 formStatus.textContent = 'Отправка...';
+
+                let themeLength = parseInt(themeLengthInput.value, 10);
+                if (isNaN(themeLength) || themeLength < 1) {
+                    showError('Поле "Длина темы" должно быть целым числом не менее 1');
+                    formStatus.textContent = '';
+                    return;
+                }
+                if (themeLength > 100) {
+                    showError('Длина темы не должна превышать 100');
+                    formStatus.textContent = '';
+                    return;
+                }
+
                 let clusteringParams, embeddingsParams;
                 try {
                     clusteringParams = JSON.parse(clusteringJsonTextarea.value.trim() || '{}');
@@ -819,13 +908,16 @@
                     formStatus.textContent = '';
                     return;
                 }
+
                 const payload = {
                     dataset_id: datasetInput.value.trim() || 'data',
                     clustering_algo: clusteringAlgoSelect.value,
                     embeddings_method: embeddingsMethodSelect.value,
+                    theme_length: themeLength,
                     clustering_hyperparams: clusteringParams,
                     embeddings_hyperparams: embeddingsParams
                 };
+
                 try {
                     const response = await authFetch('/perform_clustering', {
                         method: 'POST',
@@ -852,7 +944,6 @@
                 }
             });
 
-            // ---------- Ручная проверка статуса ----------
             checkInfoBtn.addEventListener('click', async (e) => {
                 e.preventDefault();
                 const jobId = jobIdInput.value.trim();
@@ -862,7 +953,6 @@
                 await updateJobInfo(jobId);
             });
 
-            // ---------- Получение результата ----------
             getResultBtn.addEventListener('click', async (e) => {
                 e.preventDefault();
                 const jobId = jobIdInput.value.trim();
@@ -892,12 +982,9 @@
             <p>Загрузка графика...</p>
         </div>`;
 
-                        // Загрузка картинки с авторизацией
                         (async () => {
                             try {
-                                console.log('Запрашиваю график:', plotUrl);
                                 const imgResponse = await authFetch(plotUrl);
-                                console.log('Статус ответа:', imgResponse.status);
                                 if (!imgResponse.ok) {
                                     const errText = await imgResponse.text();
                                     throw new Error(`Ошибка ${imgResponse.status}: ${errText}`);
@@ -907,11 +994,8 @@
                                 const plotContainer = document.getElementById('plot-container');
                                 if (plotContainer) {
                                     plotContainer.innerHTML = `<img src="${imgUrl}" alt="График кластеризации" style="max-width: 100%; border-radius: 12px; border: 1px solid #334155;" />`;
-                                } else {
-                                    console.error('Контейнер plot-container не найден');
                                 }
                             } catch (e) {
-                                console.error('Ошибка загрузки графика:', e);
                                 const plotContainer = document.getElementById('plot-container');
                                 if (plotContainer) {
                                     plotContainer.innerHTML = `<p style="color:#fca5a5;">Не удалось загрузить график: ${e.message}</p>`;
@@ -927,7 +1011,6 @@
                 }
             });
 
-            // Инициализация
             loadRootInfo();
         })();
     </script>

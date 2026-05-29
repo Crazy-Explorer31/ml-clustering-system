@@ -3,6 +3,8 @@ from typing import Annotated, Any, Dict, List, Literal
 
 from pydantic import BaseModel, Field
 
+# TODO: привести к одному виду
+
 
 class ClusteringRequest(BaseModel):
     dataset_id: str = Field(description="ID датасета")
@@ -14,6 +16,7 @@ class ClusteringRequest(BaseModel):
     embeddings_hyperparams: Dict[str, Any] = Field(
         description="Гиперпараметры эмбеддингов"
     )
+    theme_length: int = Field(description="Длина названия темы для кластера")
 
 
 class ClusteringRequestWithJobId(BaseModel):
@@ -22,6 +25,7 @@ class ClusteringRequestWithJobId(BaseModel):
     embeddings_method: Annotated[str, "Метод вычисления эмбеддингов"]
     clustering_hyperparams: Annotated[dict, "Гиперпараметры алгоритма кластеризации"]
     embeddings_hyperparams: Annotated[dict, "Гиперпараметры эмбеддингов"]
+    theme_length: int = Field(description="Длина названия темы для кластера")
 
     job_id: Annotated[str, "ID задачи кластеризации"]
 

@@ -2,45 +2,12 @@ from contextlib import asynccontextmanager
 import os
 import io
 import pandas as pd
-import aioboto3
 import boto3
 from botocore.exceptions import ClientError
 from botocore.config import Config
-
-# ----------------------------------- Переменные окружения ---------------------------------------
-S3_ENDPOINT = os.getenv("S3_ENDPOINT_URL", "http://localhost:9000")
-S3_ACCESS_KEY = os.getenv("S3_ACCESS_KEY", "minioadmin")
-S3_SECRET_KEY = os.getenv("S3_SECRET_KEY", "minioadmin")
-S3_BUCKET_DATASETS = os.getenv("S3_BUCKET_DATASETS", "datasets")
-S3_BUCKET_RESULTS = os.getenv("S3_BUCKET_RESULTS", "results")
-S3_REGION = os.getenv("S3_REGION", "us-east-1")
-
-S3_ENDPOINT_INTERNAL = os.environ.get("S3_ENDPOINT_URL", "http://minio:9000")
-S3_ENDPOINT_EXTERNAL = os.environ.get(
-    "S3_ENDPOINT_EXTERNAL_URL", "http://108.165.32.182:9000"
-)
-AWS_ACCESS_KEY = os.environ.get("AWS_ACCESS_KEY_ID", "minioadmin")
-AWS_SECRET_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "minioadmin")
-AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
-S3_BUCKET_RESULTS = os.environ.get("S3_BUCKET_RESULTS", "results")
-
-# ----------------------------------- Глобальные переменные --------------------------------------
-session = aioboto3.Session()
-
-S3_ENDPOINT = "http://minio:9000"
-S3_ACCESS_KEY = "minioadmin"
-S3_SECRET_KEY = "minioadmin"
+from common.env_vars import *
 
 # ----------------------------------- Функции управления S3 --------------------------------------
-
-
-# def get_s3_client():
-#     return boto3.client(
-#         "s3",
-#         endpoint_url=S3_ENDPOINT,
-#         aws_access_key_id=S3_ACCESS_KEY,
-#         aws_secret_access_key=S3_SECRET_KEY,
-#     )
 
 
 def get_s3_client(external: bool = False):

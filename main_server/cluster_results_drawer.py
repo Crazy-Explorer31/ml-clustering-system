@@ -2,41 +2,54 @@ import io
 
 import pandas as pd
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from sklearn.metrics import davies_bouldin_score, calinski_harabasz_score
 from scipy.spatial.distance import pdist, cdist
 
+from clusters_themes_modeling import get_clusters_themes
 
-def get_cluster_results_picture(df: pd.DataFrame, feature_cols=None) -> io.BytesIO:
+
+def get_cluster_results_picture(
+    df_with_embeddings: pd.DataFrame,
+    df_with_texts: pd.DataFrame,
+    theme_length,
+    feature_cols=None,
+) -> io.BytesIO:
     """
     Визуализация распределения объектов по кластерам и ключевых метрик качества.
 
     Параметры
     ----------
-    df : pd.DataFrame
+    df_with_embeddings : pd.DataFrame
         Датафрейм, содержащий столбец 'cluster' с номерами кластеров и признаки.
+    df_with_texts : pd.DataFrame
+        Датафрейм с текстами для генерации тем кластеров.
+    theme_length : int
+        Длина темы (количество слов/токенов).
     feature_cols : list or None
         Список столбцов с признаками. Если None, используются все столбцы, кроме 'cluster'.
     """
     # Определяем признаки
     if feature_cols is None:
-        feature_cols = [c for c in df.columns if c != "cluster"]
-    X = df[feature_cols].values
-    labels = df["cluster"].values
-    unique_labels = np.unique(labels)
-    k = len(unique_labels)
+        feature_cols = [c for c in df_with_embeddings.columns if c != "cluster"]
+    X = df_with_embeddings[feature_cols].values
+    labels = df_with_embeddings["cluster"].values
+    unique_labels = np.unique(
+        labels  # pyright: ignore[reportArgumentType, reportCallIssue]
+    )
+    k = len(unique_labels)  # количество непустых кластеров
+
+    clusters_themes = get_clusters_themes(df_with_texts, k, theme_length)
 
     # ------------------- Вычисление метрик -------------------
     # 1. Davies-Bouldin Index (чем меньше, тем лучше)
-    db = davies_bouldin_score(X, labels)
+    db = davies_bouldin_score(X, labels)  # pyright: ignore[reportArgumentType]
 
     # 2. Calinski-Harabasz Index (чем больше, тем лучше)
-    ch = calinski_harabasz_score(X, labels)
+    ch = calinski_harabasz_score(X, labels)  # pyright: ignore[reportArgumentType]
 
     # 3. Dunn Index (чем больше, тем лучше)
-    # Диаметр каждого кластера (максимальное расстояние между точками внутри)
     diameters = []
     for lab in unique_labels:
         pts = X[labels == lab]
@@ -46,7 +59,6 @@ def get_cluster_results_picture(df: pd.DataFrame, feature_cols=None) -> io.Bytes
             diameters.append(np.max(pdist(pts)))
     max_diam = max(diameters) if diameters else 0
 
-    # Минимальное расстояние между точками разных кластеров
     inter_min = float("inf")
     for i in range(k):
         for j in range(i + 1, k):
@@ -61,7 +73,6 @@ def get_cluster_results_picture(df: pd.DataFrame, feature_cols=None) -> io.Bytes
 
     # ------------------- Цветовое кодирование метрик -------------------
     def quality_db(val):
-        """0 – плохо (красный), 1 – отлично (зелёный) для DB Index"""
         if val <= 0.5:
             return 1.0
         elif val >= 2.0:
@@ -70,28 +81,25 @@ def get_cluster_results_picture(df: pd.DataFrame, feature_cols=None) -> io.Bytes
             return 1.0 - (val - 0.5) / (2.0 - 0.5)
 
     def quality_ch(val):
-        """Качество для CH Index: логарифмическая шкала с ориентирами 10 -> 0, 1000 -> 1"""
         if val <= 10:
             return 0.0
         elif val >= 1000:
             return 1.0
         else:
-            return (np.log10(val) - 1.0) / (3.0 - 1.0)  # log10(10)=1, log10(1000)=3
+            return (np.log10(val) - 1.0) / (3.0 - 1.0)
 
     def quality_dunn(val):
-        """Качество для Dunn Index: логарифмическая шкала с ориентирами 0.01 -> 0, 1.0 -> 1"""
         if val <= 0.01:
             return 0.0
         elif val >= 1.0:
             return 1.0
         else:
-            return (np.log10(val) - (-2)) / (0 - (-2))  # log10(0.01)=-2, log10(1)=0
+            return (np.log10(val) - (-2)) / (0 - (-2))
 
-    # Функция, возвращающая цвет по значению качества (0..1)
-    cmap = plt.cm.RdYlGn  # Red-Yellow-Green
+    cmap = plt.cm.RdYlGn  # pyright: ignore[reportAttributeAccessIssue]
 
     def quality_to_color(quality):
-        return cmap(quality)  # rgba
+        return cmap(quality)
 
     # ------------------- Построение графиков -------------------
     fig = plt.figure(figsize=(12, 7))
@@ -99,10 +107,10 @@ def get_cluster_results_picture(df: pd.DataFrame, feature_cols=None) -> io.Bytes
 
     # Верхняя строка: гистограмма распределения по кластерам
     ax_hist = fig.add_subplot(gs[0, :])
-    cluster_counts = df["cluster"].value_counts().sort_index()
+    cluster_counts = df_with_embeddings["cluster"].value_counts().sort_index()
     bars = ax_hist.bar(
         cluster_counts.index.astype(str),
-        cluster_counts.values,
+        cluster_counts.values,  # pyright: ignore[reportArgumentType]
         color="steelblue",
         edgecolor="black",
         alpha=0.85,
@@ -110,6 +118,7 @@ def get_cluster_results_picture(df: pd.DataFrame, feature_cols=None) -> io.Bytes
     ax_hist.set_xlabel("Кластер")
     ax_hist.set_ylabel("Количество объектов")
     ax_hist.set_title("Распределение объектов по кластерам")
+
     # Подписи значений на столбцах
     for bar, count in zip(bars, cluster_counts.values):
         ax_hist.text(
@@ -120,6 +129,23 @@ def get_cluster_results_picture(df: pd.DataFrame, feature_cols=None) -> io.Bytes
             va="bottom",
             fontsize=9,
         )
+
+    # ---- ДОБАВЛЕННЫЙ БЛОК: подписи тем под столбцами с поворотом ----
+    # Формируем метки: номер кластера + тема (перенос строки)
+    labels_with_themes = []
+    for label, theme in zip(cluster_counts.index, clusters_themes):
+        # Ограничим длину темы для компактности (опционально)
+        # if len(theme) > 40:
+        #     theme = theme[:37] + "..."
+        theme = theme.replace("_", "\n")
+        labels_with_themes.append(f"{label}\n{theme}")
+
+    ax_hist.set_xticks(range(len(cluster_counts)))
+    ax_hist.set_xticklabels(labels_with_themes, ha="right", fontsize=8)
+
+    # Небольшой дополнительный отступ снизу, чтобы текст не обрезался
+    plt.subplots_adjust(bottom=0.2)
+    # ----------------------------------------------------------------
 
     # Нижняя строка: три ячейки с метриками
     metrics = [
@@ -133,9 +159,8 @@ def get_cluster_results_picture(df: pd.DataFrame, feature_cols=None) -> io.Bytes
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
         ax.axis("off")
-        # Цветной прямоугольник
         color = quality_to_color(qual)
-        rect = plt.Rectangle(
+        rect = plt.Rectangle(  # pyright: ignore[reportPrivateImportUsage]
             (0.05, 0.15),
             0.9,
             0.7,
@@ -145,7 +170,6 @@ def get_cluster_results_picture(df: pd.DataFrame, feature_cols=None) -> io.Bytes
             alpha=0.9,
         )
         ax.add_patch(rect)
-        # Текст внутри прямоугольника
         ax.text(
             0.5,
             0.6,
@@ -177,13 +201,12 @@ def get_cluster_results_picture(df: pd.DataFrame, feature_cols=None) -> io.Bytes
             transform=ax.transAxes,
         )
 
-    # Общий заголовок
     fig.suptitle(
         "Оценка качества кластеризации", fontsize=14, fontweight="bold", y=1.02
     )
 
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
-    plt.close(fig)  # закрываем фигуру, чтобы не висела в памяти
-    buf.seek(0)  # возвращаем указатель на начало потока
+    plt.close(fig)
+    buf.seek(0)
     return buf

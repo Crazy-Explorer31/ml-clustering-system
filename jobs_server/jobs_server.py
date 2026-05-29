@@ -1,10 +1,6 @@
 from contextlib import asynccontextmanager
-from logging.handlers import RotatingFileHandler
 from typing import Annotated
 from pydantic import ValidationError
-import aioboto3
-from botocore.exceptions import ClientError
-from botocore.config import Config
 from fastapi import FastAPI, Response, UploadFile, File, HTTPException
 from fastapi.responses import StreamingResponse
 from contextlib import asynccontextmanager
@@ -22,11 +18,25 @@ from rq import Queue
 from rq import get_current_job
 
 from managers import *
+from common.env_vars import *
+
+# ----------------------------------- Глобальные переменные --------------------------------------
+embeddings_cache_manager = EmbeddingsCacheManager()
+clustering_manager = ClusteringManager()
+
+# --------------------------------- Функция запуска кластеризации --------------------------------
 
 
 def run_clustering(job_params: dict):
-    job_id = get_current_job().id
+    current_job = get_current_job()
+    job_id = current_job.id if current_job is not None else "-1"
     # job_id = "123" # DEBUG
+    jobs_pool = Redis(
+        host=REDIS_HOST,
+        port=int(REDIS_PORT),
+        db=int(REDIS_JOBS_POOL_ID),
+        decode_responses=True,
+    )
     update_job_status(jobs_pool, job_id, "running")
 
     embeddings_key = (
@@ -37,27 +47,38 @@ def run_clustering(job_params: dict):
     embeddings_cache_manager.make_ready(embeddings_key, job_id)
 
     clustering_manager.find_clusters(
-        embeddings_cache_manager.get(embeddings_key),
+        embeddings_cache_manager.get(
+            embeddings_key  # pyright: ignore[reportArgumentType]
+        ),
         job_params["clustering_algo"],
         job_params["clustering_hyperparams"],
         job_id,
+        job_params["dataset_id"],
     )
 
     update_job_status(jobs_pool, job_id, "done")
 
-
-# ----------------------------------- Глобальные переменные --------------------------------------
-jobs_pool = Redis(host=REDIS_HOST, port=REDIS_PORT, db=1, decode_responses=True)
-jobs_queue = Queue(connection=Redis(host=REDIS_HOST, port=REDIS_PORT, db=2))
-embeddings_cache_manager = EmbeddingsCacheManager()  # singleton?
-clustering_manager = ClusteringManager()  # singleton?
+    jobs_pool.close()
 
 
 # ----------------------------------- Функции FastAPI сервиса ------------------------------------
 @asynccontextmanager
 async def ml_lifespan_manager(app: FastAPI):
     """Менеджер контекста приложения"""
+    app.state.jobs_pool = Redis(
+        host=REDIS_HOST,
+        port=int(REDIS_PORT),
+        db=int(REDIS_JOBS_POOL_ID),
+        decode_responses=True,
+    )
+    app.state.jobs_queue = Queue(
+        connection=Redis(
+            host=REDIS_HOST, port=int(REDIS_PORT), db=int(REDIS_JOBS_QUEUE_ID)
+        )
+    )
     yield
+    app.state.jobs_queue.connection.close()
+    app.state.jobs_pool.close()
 
 
 app = FastAPI(lifespan=ml_lifespan_manager)
@@ -96,15 +117,15 @@ async def job_commit(job_info: ClusteringRequest):
         )
     print(job_params)
     # Кладём задачу в очередь
-    job = jobs_queue.enqueue(run_clustering, job_params)
+    job = app.state.jobs_queue.enqueue(run_clustering, job_params)
     response = JobAcceptedResponse(job_id=job.id)
     response_dict = response.model_dump()
     # Сохраняем данные о задаче
-    save_job_state(jobs_pool, job.id, job_params | {"status": "waiting"})
+    save_job_state(app.state.jobs_pool, job.id, job_params | {"status": "waiting"})
 
     # run_clustering(job_params) # DEBUG
     # response_dict = JobAcceptedResponse(job_id="123").model_dump() # DEBUG
-    # save_job_state(jobs_pool, "123", job_params | {"status": "waiting"}) # DEBUG
+    # save_job_state(app.state.jobs_pool, "123", job_params | {"status": "waiting"}) # DEBUG
 
     return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content=response_dict)
 
@@ -121,7 +142,7 @@ async def job_commit(job_info: ClusteringRequest):
 )
 async def job_info(job_id: Annotated[str, "ID задачи кластеризации"]):
     # Ищем задачу в сохраненных, возвращаем о ней сведения
-    job_state = get_job_state(jobs_pool, job_id)
+    job_state = get_job_state(app.state.jobs_pool, job_id)
     if job_state is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Задача не найдена"
@@ -141,12 +162,12 @@ async def job_info(job_id: Annotated[str, "ID задачи кластериза�
 )
 async def job_delete(job_id: Annotated[str, "ID задачи кластеризации"]):
     # Ищем задачу в сохраненных, в случае нахождения удаляем
-    job_state = get_job_state(jobs_pool, job_id)
+    job_state = get_job_state(app.state.jobs_pool, job_id)
     if job_state is None:
         status_code = status.HTTP_404_NOT_FOUND
     else:
         status_code = status.HTTP_201_CREATED
-        delete_job_state(jobs_pool, job_id)
+        delete_job_state(app.state.jobs_pool, job_id)
     return JSONResponse(status_code=status_code, content=None)
 
 
@@ -164,10 +185,10 @@ async def job_update(
     job_id: Annotated[str, "ID задачи кластеризации"], job_update: JobUpdateRequest
 ):
     # Ищем задачу в сохраненных, в случае нахождения обновляем
-    job_state = get_job_state(jobs_pool, job_id)
+    job_state = get_job_state(app.state.jobs_pool, job_id)
     if job_state is None:
         status_code = status.HTTP_404_NOT_FOUND
     else:
         status_code = status.HTTP_201_CREATED
-        update_job_status(jobs_pool, job_id, job_update.new_status)
+        update_job_status(app.state.jobs_pool, job_id, job_update.new_status)
     return JSONResponse(status_code=status_code, content=None)

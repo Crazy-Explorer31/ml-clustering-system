@@ -1,13 +1,13 @@
 # jobs_server/Dockerfile
-FROM python:3.11
+# FROM python:3.11
+FROM base_server:latest
 
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-# RUN wget https://dl.fbaipublicfiles.com/fasttext-wheel/vectors-crawl/cc.en.300.bin.gz
-# RUN gzip -d cc.en.300.bin.gz
 COPY . .
+
+RUN pip install --no-cache-dir -r requirements.txt
 
 ENV PYTHONUNBUFFERED=1
 

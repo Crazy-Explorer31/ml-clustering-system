@@ -5,29 +5,42 @@ import numpy as np
 
 from common.s3_operations import *
 from common.redis_operations import *
+from common.env_vars import *
 
 from redis import Redis
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from gensim.models import Word2Vec
 from nltk.tokenize import word_tokenize
-import fasttext
+
+# import fasttext
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from gensim.utils import simple_preprocess
 
 from sklearn.cluster import KMeans, SpectralClustering
 
+import nltk
 
-# ----------------------------------- Функции вычисления эмбеддингов -------------------------------
+nltk_downloaded = False
+
+
+# --------------------------------- Функции вычисления эмбеддингов -------------------------------
 def tfidf_vectorize(data, vectorize_params):
     vectorizer = TfidfVectorizer(
         **vectorize_params
     )  # FIXME: криво передаются min/max_df
     X_tfidf = vectorizer.fit_transform(data.text)
-    return pd.DataFrame(X_tfidf.toarray(), columns=vectorizer.get_feature_names_out())
+    return pd.DataFrame(
+        X_tfidf.toarray(), columns=vectorizer.get_feature_names_out()  # pyright: ignore
+    )
 
 
 def word2vec_vectorize(data, vectorize_params):
+    global nltk_downloaded
+    if not nltk_downloaded:
+        nltk.download("punkt_tab")
+        nltk_downloaded = True
+
     tokenized_data = data.text.apply(lambda x: word_tokenize(x.lower()))
 
     model = Word2Vec(sentences=tokenized_data, **vectorize_params)
@@ -47,13 +60,13 @@ def word2vec_vectorize(data, vectorize_params):
     return pd.DataFrame(doc_vectors.tolist())
 
 
-def fasttext_vectorize(data, vectorize_params):
-    ft = fasttext.load_model("cc.en.300.bin")
-    vectors = []
-    for text in data.text:
-        vector = ft.get_sentence_vector(text)
-        vectors.append(vector)
-    return pd.DataFrame(np.array(vectors))
+# def fasttext_vectorize(data, vectorize_params):
+#     ft = fasttext.load_model("./cc.en.300.bin")
+#     vectors = []
+#     for text in data.text:
+#         vector = ft.get_sentence_vector(text)
+#         vectors.append(vector)
+#     return pd.DataFrame(np.array(vectors))
 
 
 def doc2vec_vectorize(data, vectorize_params):
@@ -84,7 +97,7 @@ def doc2vec_vectorize(data, vectorize_params):
 vectorizers = {
     "tfidf": tfidf_vectorize,
     "word2vec": word2vec_vectorize,
-    "fasttext": fasttext_vectorize,
+    # "fasttext": fasttext_vectorize,
     "doc2vec": doc2vec_vectorize,
 }
 
@@ -121,14 +134,19 @@ class EmbeddingsCacheManager:
     jobs_pool = None
 
     def __init__(self):
-        self.embeddings_cache = Redis(host=REDIS_HOST, port=REDIS_PORT, db=0)
+        self.embeddings_cache = Redis(
+            host=REDIS_HOST, port=int(REDIS_PORT), db=int(REDIS_EMBEDDINGS_CACHE_ID)
+        )
         self.jobs_pool = Redis(
-            host=REDIS_HOST, port=REDIS_PORT, db=1, decode_responses=True
+            host=REDIS_HOST,
+            port=int(REDIS_PORT),
+            db=int(REDIS_JOBS_POOL_ID),
+            decode_responses=True,
         )
 
     def have_embeddings(self, embeddings_key: tuple) -> bool:
         embeddings_key_hash = get_hash(embeddings_key)
-        data = self.embeddings_cache.get(embeddings_key_hash)
+        data = self.embeddings_cache.get(embeddings_key_hash)  # pyright: ignore
         return data is not None and len(data) > 0
 
     def make_ready(self, embeddings_key: tuple, job_id: str):
@@ -146,19 +164,22 @@ class EmbeddingsCacheManager:
 
             embeddings_key_hash = get_hash(embeddings_key)
             # print(f"write: {embeddings_key_hash}", flush=True)
-            sys.stdout.flush()
             write_dataframe_to_redis(
-                dataset_vectorized, embeddings_key_hash, self.embeddings_cache
+                dataset_vectorized,
+                embeddings_key_hash,
+                self.embeddings_cache,  # pyright: ignore
             )
         except:
             update_job_status(self.jobs_pool, job_id, "failed (calculate_embeddings)")
             raise  # comment for release
 
     def get(self, embeddings_key: str) -> pd.DataFrame:
-        embeddings_key_hash = get_hash(embeddings_key)
+        embeddings_key_hash = get_hash(embeddings_key)  # pyright: ignore
         # print(f"get: {embeddings_key_hash}", flush=True)
         sys.stdout.flush()
-        return read_dataframe_from_redis(embeddings_key_hash, self.embeddings_cache)
+        return read_dataframe_from_redis(
+            embeddings_key_hash, self.embeddings_cache  # pyright: ignore
+        )
 
 
 class ClusteringManager:
@@ -166,25 +187,36 @@ class ClusteringManager:
 
     def __init__(self):
         self.jobs_pool = Redis(
-            host=REDIS_HOST, port=REDIS_PORT, db=1, decode_responses=True
+            host=REDIS_HOST,
+            port=int(REDIS_PORT),
+            db=int(REDIS_JOBS_POOL_ID),
+            decode_responses=True,
         )
 
     def find_clusters(
         self,
-        data: pd.DataFrame,
+        data_vectorized: pd.DataFrame,
         clustering_method: str,
         clustering_hyperparams: dict,
         job_id: str,
+        dataset_id,
     ):
+        data_raw = read_dataframe_from_s3(S3_BUCKET_DATASETS, f"{dataset_id}")
+
         clusterizer = clusterizers[clustering_method]
-        print(data.head())
+        print(data_vectorized.head())
         try:
-            data_clustered = clusterizer(data, clustering_hyperparams)
+            data_clustered = clusterizer(data_vectorized, clustering_hyperparams)
 
             write_dataframe_to_s3(
-                pd.concat([data_clustered, data], axis=1),
+                pd.concat([data_clustered, data_vectorized], axis=1),
                 S3_BUCKET_RESULTS,
-                f"{job_id}_full.csv",
+                f"{job_id}_with_embeddings.csv",
+            )
+            write_dataframe_to_s3(
+                pd.concat([data_clustered, data_raw], axis=1),
+                S3_BUCKET_RESULTS,
+                f"{job_id}_with_texts.csv",
             )
             write_dataframe_to_s3(data_clustered, S3_BUCKET_RESULTS, f"{job_id}.csv")
         except:

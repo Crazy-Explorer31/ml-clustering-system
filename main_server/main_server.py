@@ -1,3 +1,4 @@
+from io import BytesIO
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -31,10 +32,8 @@ from common.s3_operations import *
 from common.query_schemas import *
 from auth_utils import *
 from cluster_results_drawer import get_cluster_results_picture
-
-# ----------------------------------- Переменные окружения ---------------------------------------
-JOBS_SERVER_URL = os.getenv("JOBS_SERVER_URL", "http://localhost:8001")
-S3_BUCKET_DATASETS = os.getenv("S3_BUCKET_DATASETS", "datasets")
+from common.env_vars import *
+from preprocess_texts import get_preprocessed_texts
 
 
 # ----------------------------------- Функции FastAPI сервиса ------------------------------------
@@ -42,13 +41,22 @@ S3_BUCKET_DATASETS = os.getenv("S3_BUCKET_DATASETS", "datasets")
 async def ml_lifespan_manager(app: FastAPI):
     """Менеджер контекста приложения"""
     app.state.jobs_pool = Redis(
-        host=REDIS_HOST, port=REDIS_PORT, db=1, decode_responses=True
+        host=REDIS_HOST,
+        port=int(REDIS_PORT),
+        db=int(REDIS_JOBS_POOL_ID),
+        decode_responses=True,
     )
     app.state.queries_history = Redis(
-        host=REDIS_HOST, port=REDIS_PORT, db=3, decode_responses=True
+        host=REDIS_HOST,
+        port=int(REDIS_PORT),
+        db=int(REDIS_QUERIES_HISTORY_ID),
+        decode_responses=True,
     )
     app.state.authorised_users = Redis(
-        host=REDIS_HOST, port=REDIS_PORT, db=4, decode_responses=True
+        host=REDIS_HOST,
+        port=int(REDIS_PORT),
+        db=int(REDIS_AUTHORISED_USERS_ID),
+        decode_responses=True,
     )
     yield
     app.state.authorised_users.close()
@@ -80,9 +88,9 @@ async def register(user: UserCreate, request: Request):
 
 @app.post("/token", response_model=Token)
 async def login_for_access_token(
+    request: Request = None,  # pyright: ignore[reportArgumentType]
+    response: Response = None,  # pyright: ignore[reportArgumentType]
     form_data: OAuth2PasswordRequestForm = Depends(),
-    request: Request = None,
-    response: Response = None,
 ):
     user = authenticate_user(
         app.state.authorised_users, form_data.username, form_data.password
@@ -104,7 +112,7 @@ async def login_for_access_token(
         httponly=True,
         secure=False,
         samesite="lax",
-        path="/",  # ← кука доступна на всех путях
+        path="/",
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
 
@@ -132,9 +140,26 @@ async def upload_csv(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_active_user),
 ):
-    # Проверка на CSV (опционально)
-    if not file.filename.endswith(".csv") and file.content_type != "text/csv":
+    # Проверка на CSV
+    if (
+        file is None
+        or not file.filename.endswith(  # pyright: ignore[reportOptionalMemberAccess]
+            ".csv"
+        )
+        or file.content_type != "text/csv"
+    ):
         raise HTTPException(status_code=400, detail="Файл должен быть в формате CSV")
+
+    # Преобразование в датафрейм
+    contents = await file.read()
+    df = pd.read_csv(BytesIO(contents))
+
+    # Предобработка (стемминг, стоп-слова...)
+    df_new = get_preprocessed_texts(df)
+
+    file_bytes_new = BytesIO()
+    df_new.to_csv(file_bytes_new, index=False)
+    file_bytes_new.seek(0)
 
     dataset_key = f"{current_user.username}/{file.filename}"
 
@@ -144,7 +169,7 @@ async def upload_csv(
         await loop.run_in_executor(
             None,
             lambda: s3_client.upload_fileobj(
-                file.file, S3_BUCKET_DATASETS, dataset_key
+                file_bytes_new, S3_BUCKET_DATASETS, dataset_key
             ),
         )
     except ClientError as e:
@@ -296,16 +321,25 @@ async def job_result(
 async def get_job_plot(job_id: str, user: str = Depends(get_current_user)):
     # check res ready
     try:
-        df = read_dataframe_from_s3(S3_BUCKET_RESULTS, f"{job_id}_full.csv")
+        df_with_embeddings = read_dataframe_from_s3_with_header(
+            S3_BUCKET_RESULTS, f"{job_id}_with_embeddings.csv"
+        )
+        df_with_texts = read_dataframe_from_s3_with_header(
+            S3_BUCKET_RESULTS, f"{job_id}_with_texts.csv"
+        )
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Результат ещё не готов"
         )
 
-    df = read_dataframe_from_s3_with_header(S3_BUCKET_RESULTS, f"{job_id}_full.csv")
-    df.fillna(0, inplace=True)
-    df["cluster"] = df["cluster"].astype(int)
-    buf = get_cluster_results_picture(df)
+    df_with_embeddings.fillna(0, inplace=True)
+    df_with_embeddings["cluster"] = df_with_embeddings["cluster"].astype(int)
+    df_with_texts["cluster"] = df_with_texts["cluster"].astype(int)
+
+    job_state = get_job_state(app.state.jobs_pool, job_id)
+    theme_length = job_state["theme_length"]
+
+    buf = get_cluster_results_picture(df_with_embeddings, df_with_texts, theme_length)
 
     return StreamingResponse(buf, media_type="image/png")
 

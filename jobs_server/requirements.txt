@@ -1,16 +1,16 @@
-fastapi
-joblib
-pandas
-uvicorn
-redis
-rq
-aioboto3
-python-multipart
-aiobotocore
-pyarrow
-gensim
-fasttext-wheel
-scikit-learn
-nltk
-debugpy
-dotenv
+# fastapi
+# joblib
+# pandas
+# uvicorn
+# redis
+# rq
+# aioboto3
+# python-multipart
+# aiobotocore
+# pyarrow
+# gensim
+# fasttext-wheel
+# scikit-learn
+# nltk
+# debugpy
+# dotenv

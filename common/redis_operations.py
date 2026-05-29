@@ -6,9 +6,6 @@ import pandas as pd
 
 from redis import Redis
 
-REDIS_HOST = os.getenv("REDIS_HOST", "redis")
-REDIS_PORT = os.getenv("REDIS_PORT", "6379")
-
 
 # ----------------------------------- Функции управления Redis -------------------------------------
 def write_dataframe_to_redis(df: pd.DataFrame, key: str, redis_conn: Redis):
@@ -23,7 +20,9 @@ def read_dataframe_from_redis(key: str, redis_conn: Redis) -> pd.DataFrame:
         raise KeyError(f"Key '{key}' not found in Redis")
     if len(data) == 0:
         raise ValueError(f"Data for key '{key}' is empty (0 bytes)")
-    return pd.read_parquet(io.BytesIO(data), engine="pyarrow")
+    return pd.read_parquet(
+        io.BytesIO(data), engine="pyarrow"  # pyright: ignore[reportArgumentType]
+    )
 
 
 def save_job_state(jobs_pool, job_id: str, data: dict):

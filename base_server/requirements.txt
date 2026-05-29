@@ -1,0 +1,17 @@
+fastapi
+pandas
+redis
+rq
+uvicorn
+requests
+bcrypt
+python-jose[cryptography]
+python-multipart
+matplotlib
+scikit-learn
+botocore
+pyarrow
+gensim
+fasttext-wheel
+nltk
+boto3

@@ -1,5 +1,4 @@
 import os
-from dotenv import load_dotenv
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -9,18 +8,9 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel
 
+from common.env_vars import *
+
 # -----------------------Конфигурация JWT---------------------------
-
-# Загружаем переменные из .env
-load_dotenv()
-
-# Глобальные переменные
-SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production")  # TODO: load from .env
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 # Pydantic модели
@@ -103,7 +93,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=15))
     to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=ALGORITHM)
 
 
 # Зависимости FastAPI
@@ -130,8 +120,8 @@ def get_current_user(request: Request) -> UserInDB:
 
     # 4. Декодируем токен
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")  # pyright: ignore[reportAssignmentType]
         if username is None:
             raise credentials_exception
     except JWTError:

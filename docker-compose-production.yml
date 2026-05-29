@@ -14,7 +14,6 @@ services:
   main_server:
     build:
       context: ./main_server
-    # ports удалены – доступ только через caddy
     depends_on:
       jobs_server:
         condition: service_healthy
