@@ -1,24 +1,34 @@
 from contextlib import asynccontextmanager
 from typing import Annotated
 from pydantic import ValidationError
-from fastapi import FastAPI, Response, UploadFile, File, HTTPException
-from fastapi.responses import StreamingResponse
-from contextlib import asynccontextmanager
-import pandas as pd
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
-import asyncio
-from common.query_schemas import *
+from fastapi import FastAPI, HTTPException
+from common.query_schemas import (
+    ClusteringRequest,
+    JobAcceptedResponse,
+    JobInfoResponse,
+    JobUpdateRequest,
+)
 
-from fastapi import FastAPI, status
+from fastapi import status
 from fastapi.responses import JSONResponse
 
 from redis import Redis
 from rq import Queue
 from rq import get_current_job
 
-from managers import *
-from common.env_vars import *
+from common.redis_operations import (
+    save_job_state,
+    get_job_state,
+    delete_job_state,
+    update_job_status,
+)
+from managers import EmbeddingsCacheManager, ClusteringManager
+from common.env_vars import (
+    REDIS_HOST,
+    REDIS_PORT,
+    REDIS_JOBS_POOL_ID,
+    REDIS_JOBS_QUEUE_ID,
+)
 
 # ----------------------------------- Глобальные переменные --------------------------------------
 embeddings_cache_manager = EmbeddingsCacheManager()
@@ -116,16 +126,14 @@ async def job_commit(job_info: ClusteringRequest):
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content=None
         )
     print(job_params)
+
     # Кладём задачу в очередь
     job = app.state.jobs_queue.enqueue(run_clustering, job_params)
     response = JobAcceptedResponse(job_id=job.id)
     response_dict = response.model_dump()
+
     # Сохраняем данные о задаче
     save_job_state(app.state.jobs_pool, job.id, job_params | {"status": "waiting"})
-
-    # run_clustering(job_params) # DEBUG
-    # response_dict = JobAcceptedResponse(job_id="123").model_dump() # DEBUG
-    # save_job_state(app.state.jobs_pool, "123", job_params | {"status": "waiting"}) # DEBUG
 
     return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content=response_dict)
 

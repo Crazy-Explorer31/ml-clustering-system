@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
-from sklearn.metrics import davies_bouldin_score, calinski_harabasz_score
+from sklearn.metrics import davies_bouldin_score, calinski_harabasz_score, silhouette_score
 from scipy.spatial.distance import pdist, cdist
 
 from clusters_themes_modeling import get_clusters_themes
@@ -70,6 +70,12 @@ def get_cluster_results_picture(
     if inter_min == float("inf"):
         inter_min = 0
     dunn = inter_min / max_diam if max_diam != 0 else 0
+    
+    # 4. Silhouette Score (чем ближе к 1, тем лучше)
+    if k >= 2:
+        sil = silhouette_score(X, labels)  # pyright: ignore[reportArgumentType]
+    else:
+        sil = np.nan
 
     # ------------------- Цветовое кодирование метрик -------------------
     def quality_db(val):
@@ -96,14 +102,19 @@ def get_cluster_results_picture(
         else:
             return (np.log10(val) - (-2)) / (0 - (-2))
 
+    def quality_sil(val):
+        if np.isnan(val):
+            return 0.0
+        return (val + 1.0) / 2.0
+
     cmap = plt.cm.RdYlGn  # pyright: ignore[reportAttributeAccessIssue]
 
     def quality_to_color(quality):
         return cmap(quality)
 
     # ------------------- Построение графиков -------------------
-    fig = plt.figure(figsize=(12, 7))
-    gs = GridSpec(2, 3, figure=fig, height_ratios=[3, 1], hspace=0.4, wspace=0.3)
+    fig = plt.figure(figsize=(15, 7))
+    gs = GridSpec(2, 4, figure=fig, height_ratios=[3, 1], hspace=0.4, wspace=0.3)
 
     # Верхняя строка: гистограмма распределения по кластерам
     ax_hist = fig.add_subplot(gs[0, :])
@@ -152,6 +163,7 @@ def get_cluster_results_picture(
         ("Davies–Bouldin Index", db, "меньше → лучше", quality_db(db)),
         ("Calinski–Harabasz Index", ch, "больше → лучше", quality_ch(ch)),
         ("Dunn Index", dunn, "больше → лучше", quality_dunn(dunn)),
+        ("Silhouette Score",        sil, "больше → лучше", quality_sil(sil)),
     ]
 
     for idx, (name, value, desc, qual) in enumerate(metrics):

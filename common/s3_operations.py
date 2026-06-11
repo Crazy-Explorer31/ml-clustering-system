@@ -1,11 +1,14 @@
-from contextlib import asynccontextmanager
-import os
 import io
 import pandas as pd
 import boto3
-from botocore.exceptions import ClientError
 from botocore.config import Config
-from common.env_vars import *
+from common.env_vars import (
+    S3_ENDPOINT_EXTERNAL,
+    S3_ENDPOINT_INTERNAL,
+    AWS_ACCESS_KEY,
+    AWS_SECRET_KEY,
+    AWS_REGION,
+)
 
 # ----------------------------------- Функции управления S3 --------------------------------------
 

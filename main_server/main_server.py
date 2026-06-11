@@ -1,12 +1,8 @@
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
-import logging
-import os
 from contextlib import asynccontextmanager
-from logging.handlers import RotatingFileHandler
 from typing import Annotated
-from fastapi.staticfiles import StaticFiles
-from fastapi import Depends, FastAPI, HTTPException, status, FastAPI, File, UploadFile
-import boto3
+from fastapi import Depends, FastAPI, HTTPException, Request, status, File, UploadFile
 from botocore.exceptions import ClientError
 import asyncio
 from fastapi.security import OAuth2PasswordRequestForm
@@ -21,18 +17,40 @@ from redis import Redis
 from redis.exceptions import RedisError
 import requests
 import pandas as pd
-from fastapi import FastAPI, File, HTTPException
-from fastapi.responses import FileResponse
 
-from fastapi import FastAPI, status
 from fastapi.responses import JSONResponse
 
-from common.redis_operations import *
-from common.s3_operations import *
-from common.query_schemas import *
-from auth_utils import *
-from cluster_results_drawer import get_cluster_results_picture
-from common.env_vars import *
+from common.redis_operations import save_query, get_job_state
+from common.s3_operations import get_s3_client, read_dataframe_from_s3_with_header
+from common.query_schemas import (
+    ClusteringRequest,
+    JobAcceptedResponse,
+    JobInfoResponse,
+    ClusteringResultResponse,
+)
+from auth_utils import (
+    Token,
+    User,
+    UserCreate,
+    authenticate_user,
+    create_access_token,
+    create_user,
+    get_current_active_user,
+    get_current_user,
+    get_current_admin_user,
+)
+from main_server.cluster_results_drawer import get_cluster_results_picture
+from common.env_vars import (
+    REDIS_HOST,
+    REDIS_PORT,
+    REDIS_JOBS_POOL_ID,
+    REDIS_QUERIES_HISTORY_ID,
+    REDIS_AUTHORISED_USERS_ID,
+    JOBS_SERVER_URL,
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    S3_BUCKET_DATASETS,
+    S3_BUCKET_RESULTS,
+)
 from preprocess_texts import get_preprocessed_texts
 
 
@@ -203,7 +221,7 @@ async def perform_clustering(
 
     try:
         response = requests.post(f"{JOBS_SERVER_URL}/job_commit", json=request_dict)
-    except:
+    except Exception:
         raise HTTPException(status_code=422)
 
     status_code = response.status_code
@@ -241,7 +259,7 @@ async def job_info(
     # Перенаправляем запрос на внутренний сервер
     try:
         response = requests.get(f"{JOBS_SERVER_URL}/job_info/{job_id}")
-    except:
+    except Exception:
         raise HTTPException(status_code=422, detail="Некорректный запрос")
 
     status_code = response.status_code

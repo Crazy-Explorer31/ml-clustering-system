@@ -1,4 +1,3 @@
-import pandas as pd
 
 from gensim import corpora
 from gensim.models import LdaModel

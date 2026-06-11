@@ -3,9 +3,20 @@ import sys
 import pandas as pd
 import numpy as np
 
-from common.s3_operations import *
-from common.redis_operations import *
-from common.env_vars import *
+from common.s3_operations import read_dataframe_from_s3, write_dataframe_to_s3
+from common.redis_operations import (
+    write_dataframe_to_redis,
+    read_dataframe_from_redis,
+    update_job_status,
+)
+from common.env_vars import (
+    REDIS_HOST,
+    REDIS_PORT,
+    REDIS_EMBEDDINGS_CACHE_ID,
+    REDIS_JOBS_POOL_ID,
+    S3_BUCKET_DATASETS,
+    S3_BUCKET_RESULTS,
+)
 
 from redis import Redis
 
@@ -31,7 +42,8 @@ def tfidf_vectorize(data, vectorize_params):
     )  # FIXME: криво передаются min/max_df
     X_tfidf = vectorizer.fit_transform(data.text)
     return pd.DataFrame(
-        X_tfidf.toarray(), columns=vectorizer.get_feature_names_out()  # pyright: ignore
+        X_tfidf.toarray(), # type: ignore
+        columns=vectorizer.get_feature_names_out(),  # pyright: ignore
     )
 
 
@@ -169,7 +181,7 @@ class EmbeddingsCacheManager:
                 embeddings_key_hash,
                 self.embeddings_cache,  # pyright: ignore
             )
-        except:
+        except Exception:
             update_job_status(self.jobs_pool, job_id, "failed (calculate_embeddings)")
             raise  # comment for release
 
@@ -178,7 +190,8 @@ class EmbeddingsCacheManager:
         # print(f"get: {embeddings_key_hash}", flush=True)
         sys.stdout.flush()
         return read_dataframe_from_redis(
-            embeddings_key_hash, self.embeddings_cache  # pyright: ignore
+            embeddings_key_hash,
+            self.embeddings_cache,  # pyright: ignore
         )
 
 
@@ -219,5 +232,5 @@ class ClusteringManager:
                 f"{job_id}_with_texts.csv",
             )
             write_dataframe_to_s3(data_clustered, S3_BUCKET_RESULTS, f"{job_id}.csv")
-        except:
+        except Exception:
             update_job_status(self.jobs_pool, job_id, "failed (find_clusters)")

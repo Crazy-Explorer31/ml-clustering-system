@@ -1,14 +1,12 @@
-import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import bcrypt
 from fastapi import Depends, HTTPException, status, Request
-from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel
 
-from common.env_vars import *
+from common.env_vars import JWT_SECRET_KEY, ALGORITHM, ADMIN_USERNAME
 
 # -----------------------Конфигурация JWT---------------------------
 

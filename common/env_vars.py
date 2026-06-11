@@ -1,6 +1,7 @@
 import os
 
 # ----------------------------------- Переменные окружения ---------------------------------------
+DOMAIN = os.getenv("DOMAIN", "127.0.0.1")
 S3_ACCESS_KEY = os.getenv("S3_ACCESS_KEY", "minioadmin")
 S3_SECRET_KEY = os.getenv("S3_SECRET_KEY", "minioadmin")
 S3_BUCKET_DATASETS = os.getenv("S3_BUCKET_DATASETS", "datasets")
@@ -9,7 +10,7 @@ S3_REGION = os.getenv("S3_REGION", "us-east-1")
 
 S3_ENDPOINT_INTERNAL = os.environ.get("S3_ENDPOINT_URL", "http://minio:9000")
 S3_ENDPOINT_EXTERNAL = os.environ.get(
-    "S3_ENDPOINT_EXTERNAL_URL", "http://108.165.32.182:9000"
+    "S3_ENDPOINT_EXTERNAL_URL", f"http://{DOMAIN}:9000"
 )
 
 AWS_ACCESS_KEY = os.environ.get("AWS_ACCESS_KEY_ID", "minioadmin")

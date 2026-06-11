@@ -12,11 +12,11 @@ def get_preprocessed_texts(df: pd.DataFrame):
 
     global nltk_downloaded
     if not nltk_downloaded:
+        nltk_downloaded = True
         nltk.download("punkt")
         nltk.download("wordnet")
         nltk.download("stopwords")
         nltk.download("punkt_tab")
-        nltk_downloaded = True
 
     stop_words = set(
         stopwords.words("english")
