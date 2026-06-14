@@ -3,11 +3,11 @@ import pandas as pd
 import boto3
 from botocore.config import Config
 from common.env_vars import (
+    S3_ACCESS_KEY,
     S3_ENDPOINT_EXTERNAL,
     S3_ENDPOINT_INTERNAL,
-    AWS_ACCESS_KEY,
-    AWS_SECRET_KEY,
-    AWS_REGION,
+    S3_REGION,
+    S3_SECRET_KEY,
 )
 
 # ----------------------------------- Функции управления S3 --------------------------------------
@@ -19,9 +19,9 @@ def get_s3_client(external: bool = False):
     return boto3.client(
         "s3",
         endpoint_url=endpoint,
-        aws_access_key_id=AWS_ACCESS_KEY,
-        aws_secret_access_key=AWS_SECRET_KEY,
-        region_name=AWS_REGION,
+        aws_access_key_id=S3_ACCESS_KEY,
+        aws_secret_access_key=S3_SECRET_KEY,
+        region_name=S3_REGION,
         config=Config(s3={"addressing_style": "path"}),  # важно!
     )
 

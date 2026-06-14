@@ -22,8 +22,7 @@ def get_lda_model(documents, theme_length):
     corpus = [dictionary.doc2bow(text) for text in texts]
 
     # Обучение модели LDA
-    num_topics = theme_length
-    lda_model = LdaModel(corpus, num_topics=num_topics, id2word=dictionary, passes=15)
+    lda_model = LdaModel(corpus, num_topics=theme_length, id2word=dictionary, passes=15)
 
     return lda_model
 

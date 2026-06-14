@@ -45,7 +45,6 @@
             transform: scale(1.1);
         }
 
-        /* Кастомный tooltip (лучше стандартного title) */
         .help-icon::after {
             content: attr(data-tooltip);
             position: absolute;
@@ -446,6 +445,47 @@
             background: #1e293b;
             color: #f1f5f9;
         }
+
+        /* Стили для истории */
+        .history-item {
+            cursor: pointer;
+            padding: 0.9rem 1rem;
+            border: 1px solid #334155;
+            border-radius: 14px;
+            margin-bottom: 0.6rem;
+            background: #1a2536;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+        }
+
+        .history-item:hover {
+            background: #1e3a5f;
+            border-color: #3b82f6;
+        }
+
+        .history-item .job-id {
+            font-weight: 600;
+            color: #b9d9ff;
+            font-family: monospace;
+            font-size: 0.95rem;
+        }
+
+        .history-item .job-meta {
+            display: flex;
+            gap: 0.8rem;
+            color: #94a3b8;
+            font-size: 0.85rem;
+            flex-wrap: wrap;
+        }
+
+        .history-item .job-time {
+            color: #64748b;
+            font-size: 0.8rem;
+        }
     </style>
 </head>
 
@@ -575,6 +615,17 @@
             <div id="error-display"></div>
         </div>
 
+        <!-- Блок истории -->
+        <div class="card" id="history-card">
+            <div class="card-header">
+                <h2>История задач</h2>
+                <span class="badge">Последние 5</span>
+            </div>
+            <div id="history-list">
+                <p style="color:#94a3b8;">История пуста</p>
+            </div>
+        </div>
+
         <hr>
         <div class="footer-note">
             UI для сервиса кластеризации
@@ -616,11 +667,105 @@
             const jobInfoDisplay = document.getElementById('job-info-display');
             const resultDisplay = document.getElementById('result-display');
             const errorDisplay = document.getElementById('error-display');
+            const historyList = document.getElementById('history-list');
 
             // ---------- Состояние ----------
             let accessToken = localStorage.getItem('access_token') || null;
             let pollingIntervalId = null;
             let currentPollingJobId = null;
+            const HISTORY_KEY = 'clustering_task_history';
+            const MAX_HISTORY = 5;
+
+            // ---------- История ----------
+            function loadHistory() {
+                try {
+                    const raw = localStorage.getItem(HISTORY_KEY);
+                    return raw ? JSON.parse(raw) : [];
+                } catch {
+                    return [];
+                }
+            }
+
+            function saveHistory(historyArray) {
+                localStorage.setItem(HISTORY_KEY, JSON.stringify(historyArray.slice(0, MAX_HISTORY)));
+            }
+
+            function addToHistory(taskData) {
+                const history = loadHistory();
+                // Убираем дубликат по job_id, если есть
+                const filtered = history.filter(item => item.job_id !== taskData.job_id);
+                filtered.unshift({
+                    job_id: taskData.job_id,
+                    dataset_id: taskData.dataset_id,
+                    clustering_algo: taskData.clustering_algo,
+                    embeddings_method: taskData.embeddings_method,
+                    theme_length: taskData.theme_length,
+                    clustering_hyperparams: taskData.clustering_hyperparams,
+                    embeddings_hyperparams: taskData.embeddings_hyperparams,
+                    timestamp: Date.now()
+                });
+                saveHistory(filtered);
+                renderHistory();
+            }
+
+            function renderHistory() {
+                const history = loadHistory();
+                if (!history.length) {
+                    historyList.innerHTML = '<p style="color:#94a3b8;">История пуста</p>';
+                    return;
+                }
+
+                let html = '';
+                history.forEach(item => {
+                    const timeStr = new Date(item.timestamp).toLocaleString('ru-RU');
+                    html += `
+                    <div class="history-item" data-job-id="${escapeHtml(item.job_id)}">
+                        <div>
+                            <span class="job-id">${escapeHtml(item.job_id)}</span>
+                            <div class="job-meta">
+                                <span>📊 ${escapeHtml(item.dataset_id)}</span>
+                                <span>⚙️ ${escapeHtml(item.clustering_algo)}</span>
+                                <span>🧠 ${escapeHtml(item.embeddings_method)}</span>
+                                <span>📏 тем: ${item.theme_length ?? '—'}</span>
+                            </div>
+                        </div>
+                        <div class="job-time">${timeStr}</div>
+                    </div>`;
+                });
+                historyList.innerHTML = html;
+
+                // Навешиваем обработчики клика
+                document.querySelectorAll('.history-item').forEach(el => {
+                    el.addEventListener('click', function () {
+                        const jobId = this.getAttribute('data-job-id');
+                        if (jobId) {
+                            loadHistoryTask(jobId);
+                        }
+                    });
+                });
+            }
+
+            function escapeHtml(text) {
+                return String(text).replace(/[&<>"']/g, function (m) {
+                    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+                });
+            }
+
+            async function loadHistoryTask(jobId) {
+                // Останавливаем текущий поллинг
+                stopPolling();
+                // Заполняем поле ввода
+                jobIdInput.value = jobId;
+                // Очищаем предыдущие результаты
+                resultDisplay.innerHTML = '';
+                clearError();
+                // Получаем информацию о задаче
+                const status = await updateJobInfo(jobId);
+                // Если задача завершена, сразу подгружаем результат
+                if (status === 'done') {
+                    await fetchAndDisplayResult(jobId);
+                }
+            }
 
             // ---------- Авторизация ----------
             function updateAuthUI() {
@@ -758,7 +903,6 @@
                                 status === 'done' ? 'ГОТОВО' :
                                     status === 'failed' ? 'ОШИБКА' : status.toUpperCase();
 
-                    // Основная строка с краткой информацией
                     let html = `<div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
                         <span class="status-chip ${statusClass}">${statusText}</span>
                         <span><strong>Датасет:</strong> ${info.dataset_id || '—'}</span>
@@ -766,7 +910,6 @@
                         <span><strong>Эмбеддинги:</strong> ${info.embeddings_method || '—'}</span>
                     </div>`;
 
-                    // Блоки гиперпараметров
                     if (info.clustering_hyperparams || info.embeddings_hyperparams) {
                         html += `<div style="margin-top: 1.2rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                             <div><strong>Параметры кластеризации</strong><pre>${JSON.stringify(info.clustering_hyperparams, null, 2)}</pre></div>
@@ -774,14 +917,10 @@
                         </div>`;
                     }
 
-                    // Добавляем отображение theme_length под параметрами эмбеддингов (или отдельно, если параметров нет)
                     if (info.theme_length !== undefined && info.theme_length !== null) {
                         html += `<div style="margin-top: 1rem; border-top: 1px solid #334155; padding-top: 0.8rem;">
                             <strong>📏 Длина темы (theme_length):</strong> ${info.theme_length}
                         </div>`;
-                    } else if (info.theme_length === undefined) {
-                        // Если сервер не возвращает поле, можно показать заглушку (опционально)
-                        // html += `<div style="margin-top: 1rem;"><em>theme_length не указан</em></div>`;
                     }
 
                     jobInfoDisplay.innerHTML = html;
@@ -841,6 +980,62 @@
                     stopPolling();
                 }
             });
+
+            // ---------- Загрузка результата (вынесено для переиспользования) ----------
+            async function fetchAndDisplayResult(jobId) {
+                if (!jobId) return;
+                resultDisplay.innerHTML = '<p>Загрузка результата...</p>';
+                try {
+                    const infoRes = await authFetch(`/job_info/${encodeURIComponent(jobId)}`);
+                    const info = await infoRes.json();
+                    if (!infoRes.ok) throw new Error(info.detail || `Ошибка ${infoRes.status}`);
+                    if (info.status !== 'done') {
+                        resultDisplay.innerHTML = '';
+                        throw new Error(`Результат ещё не готов. Статус: ${info.status || 'неизвестен'}`);
+                    }
+                    const res = await authFetch(`/job_result/${encodeURIComponent(jobId)}`);
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.detail || `Ошибка ${res.status}`);
+                    const downloadUrl = data.download_url;
+                    if (downloadUrl) {
+                        const plotUrl = `/job_plot/${encodeURIComponent(jobId)}`;
+                        resultDisplay.innerHTML = `
+                        <div class="success-msg" style="display: flex; align-items: center; justify-content: space-between;">
+                            <span>Результат готов!</span>
+                            <a href="${downloadUrl}" target="_blank" class="download-link">Скачать CSV</a>
+                        </div>
+                        <div id="plot-container" style="margin-top: 1rem; text-align: center;">
+                            <p>Загрузка графика...</p>
+                        </div>`;
+
+                        (async () => {
+                            try {
+                                const imgResponse = await authFetch(plotUrl);
+                                if (!imgResponse.ok) {
+                                    const errText = await imgResponse.text();
+                                    throw new Error(`Ошибка ${imgResponse.status}: ${errText}`);
+                                }
+                                const blob = await imgResponse.blob();
+                                const imgUrl = URL.createObjectURL(blob);
+                                const plotContainer = document.getElementById('plot-container');
+                                if (plotContainer) {
+                                    plotContainer.innerHTML = `<img src="${imgUrl}" alt="График кластеризации" style="max-width: 100%; border-radius: 12px; border: 1px solid #334155;" />`;
+                                }
+                            } catch (e) {
+                                const plotContainer = document.getElementById('plot-container');
+                                if (plotContainer) {
+                                    plotContainer.innerHTML = `<p style="color:#fca5a5;">Не удалось загрузить график: ${e.message}</p>`;
+                                }
+                            }
+                        })();
+                    } else {
+                        throw new Error('Ссылка на скачивание не получена');
+                    }
+                } catch (err) {
+                    resultDisplay.innerHTML = '';
+                    showError(err.message);
+                }
+            }
 
             // ---------- JSON гиперпараметры ----------
             function getDefaultClusteringJson(algo) {
@@ -932,6 +1127,8 @@
                         jobIdInput.value = jobId;
                         formStatus.textContent = 'Готово';
                         resultDisplay.innerHTML = '';
+                        // Добавляем в историю
+                        addToHistory({ job_id: jobId, ...payload });
                         startPolling(jobId);
                     } else {
                         jobCreatedInfo.innerHTML = `<div class="success-msg">Задача принята, но ID не получен</div>`;
@@ -958,60 +1155,12 @@
                 const jobId = jobIdInput.value.trim();
                 if (!jobId) { showError('Введите ID задачи'); return; }
                 clearError();
-                resultDisplay.innerHTML = '<p>Проверка готовности результата...</p>';
-                try {
-                    const infoRes = await authFetch(`/job_info/${encodeURIComponent(jobId)}`);
-                    const info = await infoRes.json();
-                    if (!infoRes.ok) throw new Error(info.detail || `Ошибка ${infoRes.status}`);
-                    if (info.status !== 'done') {
-                        resultDisplay.innerHTML = '';
-                        throw new Error(`Результат ещё не готов. Статус: ${info.status || 'неизвестен'}`);
-                    }
-                    const res = await authFetch(`/job_result/${encodeURIComponent(jobId)}`);
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.detail || `Ошибка ${res.status}`);
-                    const downloadUrl = data.download_url;
-                    if (downloadUrl) {
-                        const plotUrl = `/job_plot/${encodeURIComponent(jobId)}`;
-                        resultDisplay.innerHTML = `
-        <div class="success-msg" style="display: flex; align-items: center; justify-content: space-between;">
-            <span>Результат готов!</span>
-            <a href="${downloadUrl}" target="_blank" class="download-link">Скачать CSV</a>
-        </div>
-        <div id="plot-container" style="margin-top: 1rem; text-align: center;">
-            <p>Загрузка графика...</p>
-        </div>`;
-
-                        (async () => {
-                            try {
-                                const imgResponse = await authFetch(plotUrl);
-                                if (!imgResponse.ok) {
-                                    const errText = await imgResponse.text();
-                                    throw new Error(`Ошибка ${imgResponse.status}: ${errText}`);
-                                }
-                                const blob = await imgResponse.blob();
-                                const imgUrl = URL.createObjectURL(blob);
-                                const plotContainer = document.getElementById('plot-container');
-                                if (plotContainer) {
-                                    plotContainer.innerHTML = `<img src="${imgUrl}" alt="График кластеризации" style="max-width: 100%; border-radius: 12px; border: 1px solid #334155;" />`;
-                                }
-                            } catch (e) {
-                                const plotContainer = document.getElementById('plot-container');
-                                if (plotContainer) {
-                                    plotContainer.innerHTML = `<p style="color:#fca5a5;">Не удалось загрузить график: ${e.message}</p>`;
-                                }
-                            }
-                        })();
-                    } else {
-                        throw new Error('Ссылка на скачивание не получена');
-                    }
-                } catch (err) {
-                    resultDisplay.innerHTML = '';
-                    showError(err.message);
-                }
+                await fetchAndDisplayResult(jobId);
             });
 
+            // Инициализация
             loadRootInfo();
+            renderHistory();
         })();
     </script>
 </body>

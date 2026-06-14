@@ -39,7 +39,7 @@ from auth_utils import (
     get_current_user,
     get_current_admin_user,
 )
-from main_server.cluster_results_drawer import get_cluster_results_picture
+from cluster_results_drawer import get_cluster_results_picture
 from common.env_vars import (
     REDIS_HOST,
     REDIS_PORT,
@@ -164,7 +164,7 @@ async def upload_csv(
         or not file.filename.endswith(  # pyright: ignore[reportOptionalMemberAccess]
             ".csv"
         )
-        or file.content_type != "text/csv"
+        # or file.content_type != "text/csv"
     ):
         raise HTTPException(status_code=400, detail="Файл должен быть в формате CSV")
 

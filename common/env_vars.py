@@ -13,9 +13,9 @@ S3_ENDPOINT_EXTERNAL = os.environ.get(
     "S3_ENDPOINT_EXTERNAL_URL", f"http://{DOMAIN}:9000"
 )
 
-AWS_ACCESS_KEY = os.environ.get("AWS_ACCESS_KEY_ID", "minioadmin")
-AWS_SECRET_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "minioadmin")
-AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+# AWS_ACCESS_KEY = os.environ.get("AWS_ACCESS_KEY_ID", "minioadmin")
+# AWS_SECRET_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "minioadmin")
+# AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
 
 REDIS_HOST = os.getenv("REDIS_HOST", "redis")
 REDIS_PORT = os.getenv("REDIS_PORT", "6379")
