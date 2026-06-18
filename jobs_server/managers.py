@@ -39,13 +39,12 @@ nltk_downloaded = False
 def tfidf_vectorize(data, vectorize_params):
     vectorizer = TfidfVectorizer(
         **vectorize_params
-    )  # FIXME: криво передаются min/max_df
+    )
     X_tfidf = vectorizer.fit_transform(data.text)
     return pd.DataFrame(
         X_tfidf.toarray(), # type: ignore
         columns=vectorizer.get_feature_names_out(),  # pyright: ignore
     )
-
 
 def word2vec_vectorize(data, vectorize_params):
     global nltk_downloaded
@@ -164,6 +163,8 @@ class EmbeddingsCacheManager:
     def make_ready(self, embeddings_key: tuple, job_id: str):
         if not self.have_embeddings(embeddings_key):
             self.calculate_embeddings(embeddings_key, job_id)
+        else:
+            print(f"[EmbeddingsCacheManager]: already have embeddings for {embeddings_key}")
 
     def calculate_embeddings(self, embeddings_key: tuple, job_id: str):
         dataset_id, embeddings_method, embeddings_hyperparams = embeddings_key
@@ -175,7 +176,7 @@ class EmbeddingsCacheManager:
             dataset_vectorized = vectorizer(dataset, embeddings_hyperparams)
 
             embeddings_key_hash = get_hash(embeddings_key)
-            # print(f"write: {embeddings_key_hash}", flush=True)
+
             write_dataframe_to_redis(
                 dataset_vectorized,
                 embeddings_key_hash,
@@ -183,12 +184,10 @@ class EmbeddingsCacheManager:
             )
         except Exception:
             update_job_status(self.jobs_pool, job_id, "failed (calculate_embeddings)")
-            raise  # comment for release
+            raise
 
     def get(self, embeddings_key: str) -> pd.DataFrame:
         embeddings_key_hash = get_hash(embeddings_key)  # pyright: ignore
-        # print(f"get: {embeddings_key_hash}", flush=True)
-        sys.stdout.flush()
         return read_dataframe_from_redis(
             embeddings_key_hash,
             self.embeddings_cache,  # pyright: ignore

@@ -4,9 +4,6 @@ from gensim.models import LdaModel
 from gensim.utils import simple_preprocess
 from gensim.parsing.preprocessing import STOPWORDS
 
-# import pyLDAvis.gensim_models as gensimvis
-# import pyLDAvis
-
 import warnings
 
 warnings.filterwarnings("ignore")

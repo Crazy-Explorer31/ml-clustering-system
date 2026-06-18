@@ -194,6 +194,16 @@ async def upload_csv(
         raise HTTPException(status_code=500, detail=f"Ошибка загрузки в S3: {e}")
     finally:
         await file.close()
+        
+    save_query(
+        app.state.queries_history,
+        current_user.username,
+        str(datetime.now(timezone.utc)),
+        {
+            "query_type": "/upload_dataset",
+            "query_body": dataset_key,
+        },
+    )
 
     return {
         "message": "Файл успешно загружен",
@@ -320,7 +330,7 @@ async def job_result(
                 "Key": f"{job_id}.csv",
             },
             ExpiresIn=600,  # 10 минут
-        )
+        ) # TODO: удалять через 10 минут
         save_query(
             app.state.queries_history,
             current_user.username,
