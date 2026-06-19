@@ -4,7 +4,7 @@
 
 ## Демонстрация работы
 
-![](https://drive.google.com/file/d/1NKPY-a0EYWySJu2vguC0hslDr2bCaKY8/view?usp=drive_link)
+[demo](https://drive.google.com/file/d/1NKPY-a0EYWySJu2vguC0hslDr2bCaKY8/view?usp=drive_link)
 
 ## Запуск системы
 
