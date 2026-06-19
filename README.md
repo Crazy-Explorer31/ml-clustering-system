@@ -4,7 +4,7 @@
 
 ## Демонстрация работы
 
-![](docs/record.mp4)
+![](https://drive.google.com/file/d/1NKPY-a0EYWySJu2vguC0hslDr2bCaKY8/view?usp=drive_link)
 
 ## Запуск системы
 
